@@ -36,6 +36,7 @@ else:
 last_signals = {}
 signal_count = 0
 bot_running = False
+bot_thread = None
 last_analysis_time = None
 using_simulation = False
 
@@ -246,12 +247,13 @@ def bot_status():
     })
 
 # === MAIN ===
-if __name__ == "__main__":
-    logger.info(f"🌐 Iniciando servidor Flask en puerto {PORT}")
+# Inicializar bot automáticamente cuando se importa el módulo (para Gunicorn)
+def init_trading_bot():
+    """Inicializa el bot de trading una sola vez"""
+    global bot_running, bot_thread
 
-    # Iniciar bot automáticamente ANTES de Flask
-    logger.info("🔄 Preparando thread de trading...")
     if not bot_running:
+        logger.info("🔄 Preparando thread de trading...")
         logger.info("🚀 Iniciando thread de trading...")
         bot_thread = threading.Thread(target=trading_loop, daemon=True)
         bot_thread.start()
@@ -262,6 +264,10 @@ if __name__ == "__main__":
         time.sleep(2)
         logger.info("⏰ Thread de trading inicializado")
 
-    # Iniciar servidor Flask
+# Inicializar bot automáticamente
+init_trading_bot()
+
+if __name__ == "__main__":
+    logger.info(f"🌐 Iniciando servidor Flask en puerto {PORT}")
     logger.info("🌐 Iniciando servidor Flask...")
     app.run(host="0.0.0.0", port=PORT, debug=False)
