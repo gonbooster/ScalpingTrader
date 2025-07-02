@@ -379,11 +379,40 @@ def debug():
         "timestamp": datetime.now().isoformat()
     })
 
+@app.route("/test")
+def test():
+    """Endpoint para forzar un análisis de prueba"""
+    logger.info("🧪 TEST: Forzando análisis manual...")
+
+    try:
+        success = check_signals()
+        logger.info(f"🧪 TEST: Resultado del análisis: {success}")
+        return jsonify({
+            "test_result": "success" if success else "failed",
+            "message": "Análisis manual ejecutado",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"🧪 TEST: Error en análisis manual: {e}")
+        return jsonify({
+            "test_result": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
 # === Loop de monitoreo ===
 def monitoring_loop():
     global bot_running
+
+    # Forzar flush de logs inmediatamente
+    import sys
+
+    logger.info("🚀 HILO DE MONITOREO INICIADO")
+    sys.stdout.flush()
+
     logger.info("🚀 Iniciando bot de trading...")
     logger.info(f"📊 Monitoreando {SYMBOL} cada 60 segundos")
+    sys.stdout.flush()
 
     email_configured = validate_config()
     if email_configured:
@@ -391,8 +420,11 @@ def monitoring_loop():
     else:
         logger.warning("📧 Email no configurado - solo monitoreo web")
 
+    sys.stdout.flush()
+
     bot_running = True
     logger.info("✅ Bot marcado como running - iniciando loop de análisis")
+    sys.stdout.flush()
 
     # Hacer primer análisis inmediatamente
     logger.info("🔄 Ejecutando primer análisis...")
@@ -433,15 +465,30 @@ if __name__ == "__main__":
     logger.info(f"⏰ Intervalo: {INTERVAL}")
     logger.info(f"📧 Email configurado: {validate_config()}")
 
-    # Iniciar loop de monitoreo en hilo separado
+    # Obtener puerto de Render
+    port = int(os.environ.get("PORT", 5000))
+
+    # Iniciar loop de monitoreo en hilo separado ANTES del servidor
     logger.info("🔄 Iniciando hilo de monitoreo...")
     monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
     monitoring_thread.start()
     logger.info("✅ Hilo de monitoreo iniciado")
 
-    # Obtener puerto de Render
-    port = int(os.environ.get("PORT", 5000))
+    # Dar tiempo para que el hilo se inicie
+    import time
+    time.sleep(2)
+    logger.info("⏰ Esperando 2 segundos para verificar hilo...")
+
+    if monitoring_thread.is_alive():
+        logger.info("✅ Hilo de monitoreo confirmado como activo")
+    else:
+        logger.error("❌ ERROR: Hilo de monitoreo no está activo")
 
     logger.info(f"🌐 Iniciando servidor web en puerto {port}...")
     logger.info("=" * 50)
+
+    # Forzar flush de logs
+    import sys
+    sys.stdout.flush()
+
     app.run(host="0.0.0.0", port=port, debug=False)
