@@ -9,8 +9,14 @@ from datetime import datetime
 import threading
 import logging
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+# Configurar logging detallado
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # === CONFIGURACIÓN ===
@@ -69,19 +75,25 @@ def get_klines(symbol, interval, limit=100):
     global using_simulation
     try:
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+        logger.info(f"📡 Conectando a Binance: {url}")
+
         response = requests.get(url, timeout=10)
+        logger.info(f"📡 Respuesta Binance: Status {response.status_code}")
+
         data = response.json()
-        
+
         if isinstance(data, dict) and "code" in data:
-            logger.warning("Binance no disponible desde esta ubicación. Usando datos simulados.")
+            logger.warning(f"⚠️ Error de Binance: {data}")
+            logger.warning("🔄 Cambiando a datos simulados...")
             using_simulation = True
             return generate_simulation_data(limit)
-        
+
+        logger.info("✅ Datos reales obtenidos de Binance")
         using_simulation = False
         return data
     except Exception as e:
-        logger.error(f"Error obteniendo datos: {e}")
-        logger.warning("Usando datos simulados para demostración.")
+        logger.error(f"❌ Error conectando con Binance: {e}")
+        logger.warning("🔄 Usando datos simulados para demostración...")
         using_simulation = True
         return generate_simulation_data(limit)
 
@@ -139,18 +151,25 @@ def rsi(prices, period=14):
 # === Bot principal ===
 def check_signals():
     global last_signal, signal_count, last_analysis_time, current_price, current_rsi
-    
+
     try:
         logger.info(f"🔍 Analizando {SYMBOL}...")
+
+        # Obtener datos
+        logger.info("📡 Obteniendo datos de mercado...")
         data = get_klines(SYMBOL, INTERVAL)
         if not data or len(data) == 0:
-            logger.error("No se pudieron obtener datos")
+            logger.error("❌ No se pudieron obtener datos")
             return False
-            
+
+        logger.info(f"✅ Obtenidos {len(data)} candles de datos")
+
         if not all(isinstance(d, list) and len(d) > 5 for d in data):
-            logger.error("Formato de datos incorrecto")
+            logger.error("❌ Formato de datos incorrecto")
             return False
             
+        # Procesar datos
+        logger.info("📊 Calculando indicadores técnicos...")
         closes = np.array([float(c[4]) for c in data])
         volumes = np.array([float(c[5]) for c in data])
 
@@ -160,33 +179,63 @@ def check_signals():
         rsi_now = rsi(closes)
         vol_now = volumes[-1]
         vol_avg = np.mean(volumes[-20:])
-        
+
+        # Actualizar variables globales
         current_price = close_now
         current_rsi = rsi_now
         last_analysis_time = datetime.now()
 
-        buy = ema_fast > ema_slow and 50 < rsi_now < 65 and vol_now > vol_avg
-        sell = ema_fast < ema_slow and 38 < rsi_now < 55 and vol_now > vol_avg
+        logger.info(f"💰 Precio actual: ${close_now:.2f}")
+        logger.info(f"📈 RSI: {rsi_now:.2f}")
+        logger.info(f"📊 EMA rápida: {ema_fast:.2f}, EMA lenta: {ema_slow:.2f}")
+        logger.info(f"📦 Volumen: {vol_now:,.0f} (Promedio: {vol_avg:,.0f})")
+
+        # Evaluar condiciones de señales
+        logger.info("🔍 Evaluando condiciones de trading...")
+
+        ema_condition_buy = ema_fast > ema_slow
+        rsi_condition_buy = 50 < rsi_now < 65
+        vol_condition_buy = vol_now > vol_avg
+
+        ema_condition_sell = ema_fast < ema_slow
+        rsi_condition_sell = 38 < rsi_now < 55
+        vol_condition_sell = vol_now > vol_avg
+
+        logger.info(f"🔍 Condiciones BUY: EMA({ema_condition_buy}) + RSI({rsi_condition_buy}) + VOL({vol_condition_buy})")
+        logger.info(f"🔍 Condiciones SELL: EMA({ema_condition_sell}) + RSI({rsi_condition_sell}) + VOL({vol_condition_sell})")
+
+        buy = ema_condition_buy and rsi_condition_buy and vol_condition_buy
+        sell = ema_condition_sell and rsi_condition_sell and vol_condition_sell
+
+        logger.info(f"🎯 Señal BUY: {buy}, Señal SELL: {sell}")
+        logger.info(f"📝 Última señal enviada: {last_signal}")
 
         if buy and last_signal != "buy":
+            logger.info("🟢 ¡SEÑAL DE COMPRA DETECTADA!")
             msg = f"🟢 BUY Signal\n{SYMBOL} a {close_now:.2f}\nRSI: {rsi_now:.2f}\nEMA Fast: {ema_fast:.2f}\nEMA Slow: {ema_slow:.2f}\nVolumen: {vol_now:,.0f}"
-            
+
             if send_email("🟢 BUY SIGNAL - Scalping Bot", msg):
                 signal_count += 1
                 last_signal = "buy"
-                logger.info(f"🟢 SEÑAL BUY enviada - Precio: {close_now:.2f}")
+                logger.info(f"✅ Email BUY enviado exitosamente - Señal #{signal_count}")
+            else:
+                logger.error("❌ Error enviando email BUY")
 
         elif sell and last_signal != "sell":
+            logger.info("🔴 ¡SEÑAL DE VENTA DETECTADA!")
             msg = f"🔴 SELL Signal\n{SYMBOL} a {close_now:.2f}\nRSI: {rsi_now:.2f}\nEMA Fast: {ema_fast:.2f}\nEMA Slow: {ema_slow:.2f}\nVolumen: {vol_now:,.0f}"
-            
+
             if send_email("🔴 SELL SIGNAL - Scalping Bot", msg):
                 signal_count += 1
                 last_signal = "sell"
-                logger.info(f"🔴 SEÑAL SELL enviada - Precio: {close_now:.2f}")
-        
+                logger.info(f"✅ Email SELL enviado exitosamente - Señal #{signal_count}")
+            else:
+                logger.error("❌ Error enviando email SELL")
+
         else:
-            logger.info(f"📊 Sin señales - Precio: {close_now:.2f} - RSI: {rsi_now:.2f}")
-        
+            logger.info(f"⏸️ Sin señales nuevas - Esperando condiciones...")
+
+        logger.info("✅ Análisis completado exitosamente")
         return True
         
     except Exception as e:
@@ -295,36 +344,98 @@ def status():
 def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
+@app.route("/debug")
+def debug():
+    """Endpoint de debug para ver el estado interno del bot"""
+    global last_analysis_time, current_price, current_rsi, signal_count, last_signal, using_simulation, bot_running
+
+    return jsonify({
+        "bot_status": {
+            "running": bot_running,
+            "last_analysis": last_analysis_time.isoformat() if last_analysis_time else None,
+            "analysis_age_seconds": (datetime.now() - last_analysis_time).total_seconds() if last_analysis_time else None
+        },
+        "market_data": {
+            "symbol": SYMBOL,
+            "current_price": current_price,
+            "current_rsi": current_rsi,
+            "using_simulation": using_simulation
+        },
+        "signals": {
+            "count": signal_count,
+            "last_signal": last_signal
+        },
+        "config": {
+            "email_configured": validate_config(),
+            "interval": INTERVAL,
+            "analysis_interval_seconds": 60
+        },
+        "timestamp": datetime.now().isoformat()
+    })
+
 # === Loop de monitoreo ===
 def monitoring_loop():
     global bot_running
     logger.info("🚀 Iniciando bot de trading...")
     logger.info(f"📊 Monitoreando {SYMBOL} cada 60 segundos")
-    
+
     email_configured = validate_config()
     if email_configured:
         logger.info("📧 Enviando alertas por email cuando detecte señales")
     else:
         logger.warning("📧 Email no configurado - solo monitoreo web")
-    
+
     bot_running = True
-    
+    logger.info("✅ Bot marcado como running - iniciando loop de análisis")
+
+    # Hacer primer análisis inmediatamente
+    logger.info("🔄 Ejecutando primer análisis...")
+    try:
+        success = check_signals()
+        if success:
+            logger.info("✅ Primer análisis completado exitosamente")
+        else:
+            logger.warning("⚠️ Primer análisis falló, continuando...")
+    except Exception as e:
+        logger.error(f"❌ Error en primer análisis: {e}")
+
+    cycle_count = 1
     while True:
         try:
-            check_signals()
+            logger.info(f"🔄 Iniciando ciclo de análisis #{cycle_count}")
+            success = check_signals()
+            if success:
+                logger.info(f"✅ Ciclo #{cycle_count} completado")
+            else:
+                logger.warning(f"⚠️ Ciclo #{cycle_count} falló")
+
+            logger.info(f"⏰ Esperando 60 segundos para próximo análisis...")
             time.sleep(60)
+            cycle_count += 1
         except Exception as e:
-            logger.error(f"Error en loop principal: {e}")
+            logger.error(f"❌ Error en loop principal (ciclo #{cycle_count}): {e}")
+            logger.info("⏰ Esperando 60 segundos antes de reintentar...")
             time.sleep(60)
 
 # === Inicio de la aplicación ===
 if __name__ == "__main__":
+    logger.info("🚀 INICIANDO SCALPING BOT...")
+    logger.info("=" * 50)
+
+    # Mostrar configuración
+    logger.info(f"📊 Símbolo: {SYMBOL}")
+    logger.info(f"⏰ Intervalo: {INTERVAL}")
+    logger.info(f"📧 Email configurado: {validate_config()}")
+
     # Iniciar loop de monitoreo en hilo separado
+    logger.info("🔄 Iniciando hilo de monitoreo...")
     monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
     monitoring_thread.start()
-    
+    logger.info("✅ Hilo de monitoreo iniciado")
+
     # Obtener puerto de Render
     port = int(os.environ.get("PORT", 5000))
-    
+
     logger.info(f"🌐 Iniciando servidor web en puerto {port}...")
+    logger.info("=" * 50)
     app.run(host="0.0.0.0", port=port, debug=False)
