@@ -1,14 +1,21 @@
 # indicators.py - Cálculos de indicadores técnicos
 import numpy as np
-import pandas as pd
 
 def calculate_ema(prices, period):
     """Calcula la Media Móvil Exponencial"""
     if len(prices) < period:
         return 0.0
-    
+
     prices_array = np.array(prices, dtype=float)
-    return pd.Series(prices_array).ewm(span=period).mean().iloc[-1]
+
+    # Calcular EMA manualmente sin pandas
+    alpha = 2.0 / (period + 1)
+    ema = prices_array[0]  # Primer valor
+
+    for price in prices_array[1:]:
+        ema = alpha * price + (1 - alpha) * ema
+
+    return ema
 
 def calculate_rsi(prices, period=14):
     """Calcula el Índice de Fuerza Relativa"""

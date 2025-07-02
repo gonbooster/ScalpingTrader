@@ -1,6 +1,6 @@
 # 🚀 ScalpingTrader - Professional Crypto Scalping Bot
 
-[![Version](https://img.shields.io/badge/version-v4.4--ADVANCED--FILTERS-blue.svg)](https://github.com/gonbooster/ScalpingTrader)
+[![Version](https://img.shields.io/badge/version-v5.0--MODULAR--PROFESSIONAL-blue.svg)](https://github.com/gonbooster/ScalpingTrader)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Deployment](https://img.shields.io/badge/deploy-Koyeb-purple.svg)](https://koyeb.com)

@@ -98,3 +98,25 @@ class Config:
             'rsi_buy_range': (cls.RSI_BUY_MIN, cls.RSI_BUY_MAX),
             'rsi_sell_range': (cls.RSI_SELL_MIN, cls.RSI_SELL_MAX)
         }
+
+def validate_config():
+    """Valida que la configuración esté completa"""
+    email_from = os.getenv("EMAIL_FROM")
+    email_password = os.getenv("EMAIL_PASSWORD")
+    email_to = os.getenv("EMAIL_TO")
+    return all([email_from, email_password, email_to])
+
+def get_missing_env_vars():
+    """Retorna las variables de entorno faltantes"""
+    required_vars = ["EMAIL_FROM", "EMAIL_PASSWORD", "EMAIL_TO"]
+    missing = []
+
+    for var in required_vars:
+        if not os.getenv(var):
+            missing.append(var)
+
+    return missing
+
+# Variables globales para compatibilidad
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+PORT = int(os.getenv("PORT", 8000))
