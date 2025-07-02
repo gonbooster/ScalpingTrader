@@ -141,3 +141,9 @@ Thumbs.db
 # Local configuration
 config.local.py
 *.local.*
+
+# Trading bot logs
+bot_logs.txt
+*.log
+logs/
+*.log.*
