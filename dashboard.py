@@ -160,11 +160,6 @@ def generate_crypto_cards(market_data, last_signals):
             <div class="candle-change {candle_class}" data-candle="{symbol}">
                 📈 Cambio Actual: {candle_change:+.2f}%
             </div>
-
-            <div class="email-indicator">
-                {'📧 ENVÍA EMAIL' if score >= 75 else '📱 Solo Dashboard'}
-                <span class="threshold">({score}/75 para email)</span>
-            </div>
             
             <div class="metrics-grid">
                 <div class="metric rsi-metric">
@@ -288,7 +283,8 @@ def get_dashboard_css():
         .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
         .metric { background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #475569; }
         .metric-value { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }
-        .metric-label { font-size: 0.8rem; color: #f1f5f9; margin-top: 4px; font-weight: 500; }
+        .metric-label { font-size: 0.8rem; color: #f1f5f9 !important; margin-top: 4px; font-weight: 500; }
+        .score-metric .metric-label { color: #f1f5f9 !important; font-weight: 600; }
         .trading-scenarios { margin-bottom: 15px; padding: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid #334155; }
         .scenario-title { font-size: 0.9rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; text-align: center; }
         .scenario { margin-bottom: 12px; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
@@ -313,12 +309,7 @@ def get_dashboard_css():
         .confidence-good { background: linear-gradient(90deg, #22c55e, #34d399); }
         .confidence-strong { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
         .confidence-excellent { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
-        .email-indicator {
-            text-align: center; padding: 8px 12px; border-radius: 8px;
-            font-weight: 600; margin-bottom: 15px; font-size: 0.85rem;
-            background: rgba(59, 130, 246, 0.15); color: #f1f5f9; border: 1px solid rgba(59, 130, 246, 0.4);
-        }
-        .threshold { font-size: 0.75rem; opacity: 0.9; color: #94a3b8; }
+
 
         .footer { text-align: center; margin-top: 25px; color: #64748b; font-size: 0.85rem; }
         .update-indicator { position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 10px 18px; border-radius: 25px; font-size: 0.85rem; opacity: 0; transition: all 0.3s ease; z-index: 1000; }
