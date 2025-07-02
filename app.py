@@ -20,25 +20,107 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # === CONFIGURACIÓN ===
-VERSION = "v2.2-FIX"
-DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")  # Se actualiza automáticamente en cada deploy
+VERSION = "v3.0-MULTI"
+DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
-SYMBOL = os.getenv("SYMBOL", "BTCUSDT")
-INTERVAL = os.getenv("INTERVAL", "1m")
+# Múltiples pares como en tu script Pine
+SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+INTERVAL = "1m"
+INTERVAL_15M = "15m"
+INTERVAL_1H = "1h"
 
 # Configuración de email desde variables de entorno
 EMAIL_FROM = os.getenv("EMAIL_FROM")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 EMAIL_TO = os.getenv("EMAIL_TO")
 
-# Variables globales
-last_signal = None
+# Variables globales para múltiples pares
+market_data = {
+    "BTCUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0},
+    "ETHUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0},
+    "SOLUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0}
+}
 signal_count = 0
 last_analysis_time = None
-current_price = 0
-current_rsi = 0
 using_simulation = False
 bot_running = False
+
+# === Funciones de detección de pares (como en Pine Script) ===
+def detect_pair_type(symbol):
+    """Detecta el tipo de par como en tu script Pine"""
+    ticker = symbol.upper()
+    if "BTC" in ticker:
+        return "BTC"
+    elif "ETH" in ticker:
+        return "ETH"
+    elif "SOL" in ticker:
+        return "SOL"
+    else:
+        return "OTHER"
+
+def get_adaptive_params(pair_type):
+    """Parámetros adaptativos por par como en tu script Pine"""
+    if pair_type == "BTC":
+        return {
+            "ema_fast": 10, "ema_slow": 21,
+            "rsi_low": 50, "rsi_high": 65,
+            "vol_multiplier": 1.8,
+            "emoji": "🟠", "name": "BTC"
+        }
+    elif pair_type == "ETH":
+        return {
+            "ema_fast": 9, "ema_slow": 23,
+            "rsi_low": 47, "rsi_high": 63,
+            "vol_multiplier": 1.6,
+            "emoji": "🟣", "name": "ETH"
+        }
+    elif pair_type == "SOL":
+        return {
+            "ema_fast": 7, "ema_slow": 20,
+            "rsi_low": 45, "rsi_high": 68,
+            "vol_multiplier": 1.4,
+            "emoji": "🔵", "name": "SOL"
+        }
+    else:
+        return {
+            "ema_fast": 10, "ema_slow": 21,
+            "rsi_low": 50, "rsi_high": 65,
+            "vol_multiplier": 1.5,
+            "emoji": "❓", "name": "OTHER"
+        }
+
+def is_valid_trading_hour():
+    """Filtro de horarios como en tu script Pine (8-18 UTC)"""
+    current_hour = datetime.utcnow().hour
+    return 8 <= current_hour <= 18
+
+def calculate_confidence_score(symbol, rsi, rsi_15m, volume, vol_avg, ema_fast, ema_slow, macro_trend, pair_type):
+    """Score de confianza 0-100 como en tu script Pine"""
+    score = 0
+
+    # RSI 15m > 50: +25 puntos
+    if rsi_15m > 50:
+        score += 25
+
+    # Volumen alto: +25, normal: +15
+    if volume > vol_avg * 1.5:
+        score += 25
+    elif volume > vol_avg:
+        score += 15
+
+    # Macro trend para BTC: +20
+    if pair_type == "BTC" and macro_trend:
+        score += 20
+
+    # Cruce de EMAs: +15
+    if abs(ema_fast - ema_slow) > 0:
+        score += 15
+
+    # RSI en zona óptima: +15
+    if 50 < rsi < 60:
+        score += 15
+
+    return min(score, 100)
 
 # === Validación de configuración ===
 def validate_config():
@@ -100,6 +182,25 @@ def get_klines(symbol, interval, limit=100):
         using_simulation = True
         return generate_simulation_data(limit)
 
+def get_multi_timeframe_data(symbol):
+    """Obtiene datos de múltiples timeframes como en tu script Pine"""
+    try:
+        # Datos principales (1m)
+        data_1m = get_klines(symbol, INTERVAL, 100)
+        # Datos 15m para confirmación
+        data_15m = get_klines(symbol, INTERVAL_15M, 50)
+        # Datos 1h para macro trend
+        data_1h = get_klines(symbol, INTERVAL_1H, 30)
+
+        return {
+            "1m": data_1m,
+            "15m": data_15m,
+            "1h": data_1h
+        }
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo datos multi-timeframe: {e}")
+        return None
+
 def generate_simulation_data(limit=100):
     """Genera datos simulados realistas para BTCUSDT"""
     import random
@@ -151,98 +252,251 @@ def rsi(prices, period=14):
     rs = avg_gain / avg_loss if avg_loss != 0 else 0
     return 100 - (100 / (1 + rs))
 
-# === Bot principal ===
-def check_signals():
-    global last_signal, signal_count, last_analysis_time, current_price, current_rsi
+def atr(highs, lows, closes, period=14):
+    """Calcula Average True Range"""
+    if len(highs) < 2:
+        return 0.0
 
+    tr1 = highs[1:] - lows[1:]
+    tr2 = np.abs(highs[1:] - closes[:-1])
+    tr3 = np.abs(lows[1:] - closes[:-1])
+
+    true_range = np.maximum(tr1, np.maximum(tr2, tr3))
+    return np.mean(true_range[-period:]) if len(true_range) >= period else np.mean(true_range)
+
+# === Bot principal multi-par ===
+def analyze_symbol(symbol):
+    """Analiza un símbolo específico con la estrategia de tu script Pine"""
     try:
-        logger.info(f"🔍 Analizando {SYMBOL}...")
+        logger.info(f"🔍 Analizando {symbol}...")
 
-        # Obtener datos
-        logger.info("📡 Obteniendo datos de mercado...")
-        data = get_klines(SYMBOL, INTERVAL)
-        if not data or len(data) == 0:
-            logger.error("❌ No se pudieron obtener datos")
+        # Detectar tipo de par
+        pair_type = detect_pair_type(symbol)
+        params = get_adaptive_params(pair_type)
+
+        # Obtener datos multi-timeframe
+        logger.info("📡 Obteniendo datos multi-timeframe...")
+        mtf_data = get_multi_timeframe_data(symbol)
+        if not mtf_data:
+            logger.error(f"❌ No se pudieron obtener datos para {symbol}")
             return False
 
-        logger.info(f"✅ Obtenidos {len(data)} candles de datos")
-
-        if not all(isinstance(d, list) and len(d) > 5 for d in data):
-            logger.error("❌ Formato de datos incorrecto")
+        # Procesar datos 1m (principal)
+        data_1m = mtf_data["1m"]
+        if not data_1m or len(data_1m) < 50:
+            logger.error(f"❌ Datos insuficientes para {symbol}")
             return False
+
+        # Procesar datos 15m y 1h
+        data_15m = mtf_data["15m"]
+        data_1h = mtf_data["1h"]
             
-        # Procesar datos
+        # Calcular indicadores técnicos con parámetros adaptativos
         logger.info("📊 Calculando indicadores técnicos...")
-        closes = np.array([float(c[4]) for c in data])
-        volumes = np.array([float(c[5]) for c in data])
 
-        ema_fast = ema(closes, 10)
-        ema_slow = ema(closes, 21)
-        close_now = closes[-1]
-        rsi_now = rsi(closes)
-        vol_now = volumes[-1]
-        vol_avg = np.mean(volumes[-20:])
+        # Datos 1m (principal)
+        closes_1m = np.array([float(c[4]) for c in data_1m])
+        volumes_1m = np.array([float(c[5]) for c in data_1m])
+        highs_1m = np.array([float(c[2]) for c in data_1m])
+        lows_1m = np.array([float(c[3]) for c in data_1m])
 
-        # Actualizar variables globales
-        current_price = close_now
-        current_rsi = rsi_now
-        last_analysis_time = datetime.now()
+        # EMAs adaptativas según el par
+        ema_fast_val = ema(closes_1m, params["ema_fast"])
+        ema_slow_val = ema(closes_1m, params["ema_slow"])
 
-        logger.info(f"💰 Precio actual: ${close_now:.2f}")
-        logger.info(f"📈 RSI: {rsi_now:.2f}")
-        logger.info(f"📊 EMA rápida: {ema_fast:.2f}, EMA lenta: {ema_slow:.2f}")
-        logger.info(f"📦 Volumen: {vol_now:,.0f} (Promedio: {vol_avg:,.0f})")
+        # RSI principal
+        rsi_1m = rsi(closes_1m)
 
-        # Evaluar condiciones de señales
+        # ATR para stop-loss dinámico
+        atr_val = atr(highs_1m, lows_1m, closes_1m)
+
+        # Volumen
+        vol_now = volumes_1m[-1]
+        vol_avg = np.mean(volumes_1m[-20:])
+
+        # Datos 15m para confirmación
+        if data_15m and len(data_15m) >= 14:
+            closes_15m = np.array([float(c[4]) for c in data_15m])
+            rsi_15m = rsi(closes_15m)
+        else:
+            rsi_15m = rsi_1m  # Fallback
+
+        # Datos 1h para macro trend
+        if data_1h and len(data_1h) >= 21:
+            closes_1h = np.array([float(c[4]) for c in data_1h])
+            ema_1h_fast = ema(closes_1h, 9)
+            ema_1h_slow = ema(closes_1h, 21)
+            macro_trend = ema_1h_fast > ema_1h_slow
+        else:
+            macro_trend = True  # Fallback
+
+        close_now = closes_1m[-1]
+
+        logger.info(f"💰 {symbol} Precio: ${close_now:.2f}")
+        logger.info(f"📈 RSI: {rsi_1m:.2f} (15m: {rsi_15m:.2f})")
+        logger.info(f"📊 EMA {params['ema_fast']}/{params['ema_slow']}: {ema_fast_val:.2f}/{ema_slow_val:.2f}")
+        logger.info(f"📦 Volumen: {vol_now:,.0f} (Avg: {vol_avg:,.0f})")
+        logger.info(f"🎯 ATR: {atr_val:.2f}, Macro: {macro_trend}")
+
+        # Evaluar condiciones de señales (como en tu script Pine)
         logger.info("🔍 Evaluando condiciones de trading...")
 
-        ema_condition_buy = ema_fast > ema_slow
-        rsi_condition_buy = 50 < rsi_now < 65
-        vol_condition_buy = vol_now > vol_avg
+        # Detectar cruces de EMAs
+        prev_ema_fast = ema(closes_1m[:-1], params["ema_fast"])
+        prev_ema_slow = ema(closes_1m[:-1], params["ema_slow"])
 
-        ema_condition_sell = ema_fast < ema_slow
-        rsi_condition_sell = 38 < rsi_now < 55
-        vol_condition_sell = vol_now > vol_avg
+        crossover_buy = prev_ema_fast <= prev_ema_slow and ema_fast_val > ema_slow_val
+        crossunder_sell = prev_ema_fast >= prev_ema_slow and ema_fast_val < ema_slow_val
 
-        logger.info(f"🔍 Condiciones BUY: EMA({ema_condition_buy}) + RSI({rsi_condition_buy}) + VOL({vol_condition_buy})")
-        logger.info(f"🔍 Condiciones SELL: EMA({ema_condition_sell}) + RSI({rsi_condition_sell}) + VOL({vol_condition_sell})")
+        # Condiciones de compra (como en Pine Script)
+        buy_conditions = {
+            "crossover": crossover_buy,
+            "rsi_range": params["rsi_low"] < rsi_1m < params["rsi_high"],
+            "volume": vol_now > vol_avg,
+            "rsi_15m": rsi_15m > 50,
+            "macro_trend": macro_trend if pair_type == "BTC" else True,
+            "valid_hour": is_valid_trading_hour()
+        }
 
-        buy = ema_condition_buy and rsi_condition_buy and vol_condition_buy
-        sell = ema_condition_sell and rsi_condition_sell and vol_condition_sell
+        # Condiciones de venta (como en Pine Script)
+        sell_conditions = {
+            "crossunder": crossunder_sell,
+            "rsi_range": 35 < rsi_1m < 55,
+            "volume": vol_now > vol_avg,
+            "rsi_15m": rsi_15m < 50,
+            "macro_trend": not macro_trend if pair_type == "BTC" else True,
+            "valid_hour": is_valid_trading_hour()
+        }
 
-        logger.info(f"🎯 Señal BUY: {buy}, Señal SELL: {sell}")
-        logger.info(f"📝 Última señal enviada: {last_signal}")
+        # Señales básicas
+        buy_signal = all(buy_conditions.values())
+        sell_signal = all(sell_conditions.values())
 
-        if buy and last_signal != "buy":
-            logger.info("🟢 ¡SEÑAL DE COMPRA DETECTADA!")
-            msg = f"🟢 BUY Signal\n{SYMBOL} a {close_now:.2f}\nRSI: {rsi_now:.2f}\nEMA Fast: {ema_fast:.2f}\nEMA Slow: {ema_slow:.2f}\nVolumen: {vol_now:,.0f}"
+        # Señales fuertes (con volumen alto)
+        strong_buy = (buy_signal and
+                     vol_now > vol_avg * params["vol_multiplier"] and
+                     params["rsi_low"] + 2 < rsi_1m < params["rsi_high"] - 2)
 
-            if send_email("🟢 BUY SIGNAL - Scalping Bot", msg):
+        strong_sell = (sell_signal and
+                      vol_now > vol_avg * params["vol_multiplier"] and
+                      38 < rsi_1m < 48)
+
+        # Calcular score de confianza (0-100)
+        confidence_score = calculate_confidence_score(
+            symbol, rsi_1m, rsi_15m, vol_now, vol_avg,
+            ema_fast_val, ema_slow_val, macro_trend, pair_type
+        )
+
+        # Actualizar datos del mercado
+        market_data[symbol].update({
+            "score": confidence_score,
+            "atr": atr_val
+        })
+
+        # Log detallado de condiciones
+        logger.info(f"🔍 Condiciones BUY: {buy_conditions}")
+        logger.info(f"🔍 Condiciones SELL: {sell_conditions}")
+        logger.info(f"🎯 Señal BUY: {buy_signal}, Strong: {strong_buy}")
+        logger.info(f"🎯 Señal SELL: {sell_signal}, Strong: {strong_sell}")
+        logger.info(f"📊 Score de confianza: {confidence_score}/100")
+        logger.info(f"📝 Última señal {symbol}: {market_data[symbol]['last_signal']}")
+
+        # Procesar señales
+        current_signal = market_data[symbol]["last_signal"]
+
+        if (buy_signal or strong_buy) and current_signal != "buy":
+            signal_type = "STRONG BUY" if strong_buy else "BUY"
+            logger.info(f"🟢 ¡SEÑAL DE {signal_type} DETECTADA para {symbol}!")
+
+            # Crear mensaje detallado
+            msg = f"""🟢 {signal_type} SIGNAL - {params['emoji']} {params['name']}
+
+💰 Precio: ${close_now:.2f}
+📈 RSI: {rsi_1m:.2f} (15m: {rsi_15m:.2f})
+📊 EMA {params['ema_fast']}/{params['ema_slow']}: {ema_fast_val:.2f}/{ema_slow_val:.2f}
+📦 Volumen: {vol_now:,.0f} (Avg: {vol_avg:,.0f})
+🎯 Score: {confidence_score}/100
+🛡️ ATR: {atr_val:.2f}
+⏰ Hora: {datetime.utcnow().strftime('%H:%M UTC')}
+
+Condiciones:
+✅ Cruce EMA: {crossover_buy}
+✅ RSI: {params['rsi_low']}-{params['rsi_high']} ({rsi_1m:.1f})
+✅ Volumen: {vol_now > vol_avg}
+✅ RSI 15m: {rsi_15m > 50} ({rsi_15m:.1f})
+✅ Macro Trend: {macro_trend if pair_type == 'BTC' else 'N/A'}
+✅ Horario: {is_valid_trading_hour()}"""
+
+            if send_email(f"🟢 {signal_type} - {symbol} Scalping Bot", msg):
+                global signal_count
                 signal_count += 1
-                last_signal = "buy"
-                logger.info(f"✅ Email BUY enviado exitosamente - Señal #{signal_count}")
+                market_data[symbol]["last_signal"] = "buy"
+                logger.info(f"✅ Email {signal_type} enviado - {symbol} - Señal #{signal_count}")
             else:
-                logger.error("❌ Error enviando email BUY")
+                logger.error(f"❌ Error enviando email {signal_type} - {symbol}")
 
-        elif sell and last_signal != "sell":
-            logger.info("🔴 ¡SEÑAL DE VENTA DETECTADA!")
-            msg = f"🔴 SELL Signal\n{SYMBOL} a {close_now:.2f}\nRSI: {rsi_now:.2f}\nEMA Fast: {ema_fast:.2f}\nEMA Slow: {ema_slow:.2f}\nVolumen: {vol_now:,.0f}"
+        elif (sell_signal or strong_sell) and current_signal != "sell":
+            signal_type = "STRONG SELL" if strong_sell else "SELL"
+            logger.info(f"🔴 ¡SEÑAL DE {signal_type} DETECTADA para {symbol}!")
 
-            if send_email("🔴 SELL SIGNAL - Scalping Bot", msg):
+            # Crear mensaje detallado
+            msg = f"""🔴 {signal_type} SIGNAL - {params['emoji']} {params['name']}
+
+💰 Precio: ${close_now:.2f}
+📈 RSI: {rsi_1m:.2f} (15m: {rsi_15m:.2f})
+📊 EMA {params['ema_fast']}/{params['ema_slow']}: {ema_fast_val:.2f}/{ema_slow_val:.2f}
+📦 Volumen: {vol_now:,.0f} (Avg: {vol_avg:,.0f})
+🎯 Score: {confidence_score}/100
+🛡️ ATR: {atr_val:.2f}
+⏰ Hora: {datetime.utcnow().strftime('%H:%M UTC')}
+
+Condiciones:
+✅ Cruce EMA: {crossunder_sell}
+✅ RSI: 35-55 ({rsi_1m:.1f})
+✅ Volumen: {vol_now > vol_avg}
+✅ RSI 15m: {rsi_15m < 50} ({rsi_15m:.1f})
+✅ Macro Trend: {not macro_trend if pair_type == 'BTC' else 'N/A'}
+✅ Horario: {is_valid_trading_hour()}"""
+
+            if send_email(f"🔴 {signal_type} - {symbol} Scalping Bot", msg):
                 signal_count += 1
-                last_signal = "sell"
-                logger.info(f"✅ Email SELL enviado exitosamente - Señal #{signal_count}")
+                market_data[symbol]["last_signal"] = "sell"
+                logger.info(f"✅ Email {signal_type} enviado - {symbol} - Señal #{signal_count}")
             else:
-                logger.error("❌ Error enviando email SELL")
+                logger.error(f"❌ Error enviando email {signal_type} - {symbol}")
 
         else:
-            logger.info(f"⏸️ Sin señales nuevas - Esperando condiciones...")
+            logger.info(f"⏸️ {symbol} - Sin señales nuevas (Score: {confidence_score}/100)")
 
-        logger.info("✅ Análisis completado exitosamente")
+        logger.info(f"✅ Análisis de {symbol} completado")
         return True
-        
+
     except Exception as e:
-        logger.error(f"Error en análisis: {e}")
+        logger.error(f"❌ Error analizando {symbol}: {e}")
+        return False
+
+def check_signals():
+    """Función principal que analiza todos los símbolos"""
+    global last_analysis_time
+
+    try:
+        logger.info("🔍 Iniciando análisis multi-par...")
+        last_analysis_time = datetime.now()
+
+        success_count = 0
+        for symbol in SYMBOLS:
+            try:
+                if analyze_symbol(symbol):
+                    success_count += 1
+                time.sleep(1)  # Pequeña pausa entre símbolos
+            except Exception as e:
+                logger.error(f"❌ Error procesando {symbol}: {e}")
+
+        logger.info(f"✅ Análisis completado: {success_count}/{len(SYMBOLS)} símbolos exitosos")
+        return success_count > 0
+
+    except Exception as e:
+        logger.error(f"❌ Error en análisis principal: {e}")
         return False
 
 # === Flask App ===
@@ -250,100 +504,244 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    global last_analysis_time, current_price, current_rsi, signal_count, last_signal, using_simulation, bot_running
-    
+    global last_analysis_time, signal_count, using_simulation, bot_running, market_data
+
     status = "🟢 ACTIVO" if bot_running and last_analysis_time else "🟡 INICIANDO"
     last_time = last_analysis_time.strftime('%H:%M:%S') if last_analysis_time else "N/A"
     data_source = "📊 Datos simulados (demo)" if using_simulation else "📡 Datos reales de Binance"
-    email_status = "✅ Configurado" if all([EMAIL_FROM, EMAIL_PASSWORD, EMAIL_TO]) else "⚠️ No configurado"
+    email_status = "✅ Configurado" if validate_config() else "⚠️ No configurado"
+    current_hour = datetime.utcnow().hour
+    trading_hour_status = "✅ Horario óptimo" if is_valid_trading_hour() else "⚠️ Fuera de horario"
     
+    # Generar tarjetas de criptomonedas
+    crypto_cards = ""
+    total_score = 0
+    active_pairs = 0
+
+    for symbol in SYMBOLS:
+        data = market_data[symbol]
+        pair_type = detect_pair_type(symbol)
+        params = get_adaptive_params(pair_type)
+
+        if data["price"] > 0:
+            active_pairs += 1
+            total_score += data["score"]
+
+        # Determinar estado de señal
+        if data["last_signal"] == "buy":
+            signal_class = "signal-buy"
+            signal_text = "🟢 COMPRA ACTIVA"
+        elif data["last_signal"] == "sell":
+            signal_class = "signal-sell"
+            signal_text = "🔴 VENTA ACTIVA"
+        else:
+            signal_class = "signal-wait"
+            signal_text = "⏸️ ESPERANDO"
+
+        crypto_cards += f"""
+        <div class="crypto-card {pair_type.lower()}">
+            <div class="crypto-header">
+                <div class="crypto-name">{params['emoji']} {params['name']}</div>
+                <div class="crypto-price">${data['price']:.2f}</div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-value">{data['rsi']:.1f}</div>
+                    <div class="metric-label">RSI</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">{data['ema_fast']:.2f}</div>
+                    <div class="metric-label">EMA {params['ema_fast']}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">{data['ema_slow']:.2f}</div>
+                    <div class="metric-label">EMA {params['ema_slow']}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">{data['atr']:.2f}</div>
+                    <div class="metric-label">ATR</div>
+                </div>
+            </div>
+
+            <div class="signal-status {signal_class}">
+                {signal_text}
+            </div>
+
+            <div style="margin-top: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><strong>Score de Confianza:</strong></span>
+                    <span><strong>{data["score"]}/100</strong></span>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width: {data["score"]}%;"></div>
+                </div>
+            </div>
+        </div>
+        """
+
+    avg_score = f"{total_score // max(active_pairs, 1)}/100" if active_pairs > 0 else "0/100"
+    status_class = "active" if status == "🟢 ACTIVO" else "waiting"
+
+    # Crear HTML directamente (más simple y confiable)
     html = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="es">
     <head>
-        <title>Scalping Bot</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>🤖 Scalping PRO - Multi-Par Dashboard</title>
         <meta http-equiv="refresh" content="30">
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
-            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
-            .header {{ text-align: center; color: #333; }}
-            .status {{ text-align: center; font-size: 24px; margin: 20px 0; }}
-            .active {{ color: #28a745; }}
-            .waiting {{ color: #ffc107; }}
-            .info {{ background: #e9ecef; padding: 15px; border-radius: 5px; margin: 15px 0; }}
-            .metric {{ display: inline-block; margin: 10px 20px; text-align: center; }}
-            .metric-value {{ font-size: 18px; font-weight: bold; color: #007bff; }}
-            .metric-label {{ font-size: 12px; color: #666; }}
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh; padding: 20px;
+            }}
+            .container {{
+                max-width: 1400px; margin: 0 auto;
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            }}
+            .header {{
+                background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+                color: white; padding: 30px; text-align: center;
+            }}
+            .header h1 {{ font-size: 2.5em; margin-bottom: 10px; }}
+            .version {{ font-size: 0.9em; opacity: 0.8; margin-top: 15px; }}
+            .status-bar {{
+                background: #f8f9fa; padding: 20px; display: flex;
+                justify-content: space-between; flex-wrap: wrap;
+            }}
+            .status-item {{
+                margin: 5px; padding: 10px 15px; background: white;
+                border-radius: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }}
+            .status-active {{ color: #28a745; }}
+            .status-waiting {{ color: #ffc107; }}
+            .main-content {{ padding: 30px; }}
+            .crypto-grid {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+                gap: 25px; margin-bottom: 30px;
+            }}
+            .crypto-card {{
+                background: white; border-radius: 15px; padding: 25px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-left: 5px solid;
+            }}
+            .crypto-card.btc {{ border-left-color: #f7931a; }}
+            .crypto-card.eth {{ border-left-color: #627eea; }}
+            .crypto-card.sol {{ border-left-color: #9945ff; }}
+            .crypto-header {{
+                display: flex; justify-content: space-between;
+                align-items: center; margin-bottom: 20px;
+            }}
+            .crypto-name {{ font-size: 1.5em; font-weight: bold; }}
+            .crypto-price {{ font-size: 1.8em; font-weight: bold; color: #2c3e50; }}
+            .metrics-grid {{
+                display: grid; grid-template-columns: repeat(2, 1fr);
+                gap: 15px; margin-bottom: 20px;
+            }}
+            .metric {{ background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; }}
+            .metric-value {{ font-size: 1.4em; font-weight: bold; color: #2c3e50; }}
+            .metric-label {{ font-size: 0.9em; color: #6c757d; margin-top: 5px; }}
+            .signal-status {{
+                padding: 15px; border-radius: 10px; text-align: center;
+                font-weight: bold; margin-top: 15px;
+            }}
+            .signal-buy {{ background: linear-gradient(135deg, #28a745, #20c997); color: white; }}
+            .signal-sell {{ background: linear-gradient(135deg, #dc3545, #fd7e14); color: white; }}
+            .signal-wait {{ background: linear-gradient(135deg, #6c757d, #adb5bd); color: white; }}
+            .confidence-bar {{
+                width: 100%; height: 20px; background: #e9ecef;
+                border-radius: 10px; overflow: hidden; margin-top: 10px;
+            }}
+            .confidence-fill {{
+                height: 100%; background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
+                transition: width 0.3s ease;
+            }}
+            .stats-section {{
+                background: white; border-radius: 15px; padding: 25px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 30px;
+            }}
+            .stats-grid {{
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+            }}
+            .stat-card {{ background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; }}
+            .stat-value {{ font-size: 2em; font-weight: bold; color: #2c3e50; }}
+            .stat-label {{ color: #6c757d; margin-top: 5px; }}
+            .footer {{ background: #2c3e50; color: white; padding: 20px; text-align: center; }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>🤖 Scalping Alert Bot</h1>
-                <p>Trading automático con EMA y RSI</p>
-                <div style="font-size: 11px; color: #888; margin-top: 8px; border-top: 1px solid #333; padding-top: 8px;">
-                    {VERSION} • Deploy: {DEPLOY_TIME}
+                <h1>🤖 Scalping PRO Dashboard</h1>
+                <p>Análisis Multi-Par Avanzado • BTC/ETH/SOL</p>
+                <div class="version">{VERSION} • Deploy: {DEPLOY_TIME}</div>
+            </div>
+
+            <div class="status-bar">
+                <div class="status-item status-{status_class}">🤖 Estado: {status}</div>
+                <div class="status-item">📧 Email: {email_status}</div>
+                <div class="status-item">⏰ Horario: {trading_hour_status}</div>
+                <div class="status-item">📡 Fuente: {data_source}</div>
+                <div class="status-item">🔔 Señales: {signal_count}</div>
+                <div class="status-item">⏱️ Último: {last_time}</div>
+            </div>
+
+            <div class="main-content">
+                <div class="crypto-grid">
+                    {crypto_cards}
+                </div>
+
+                <div class="stats-section">
+                    <h2 style="margin-bottom: 20px; color: #2c3e50;">📊 Estadísticas Generales</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value">{signal_count}</div>
+                            <div class="stat-label">Señales Enviadas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{active_pairs}</div>
+                            <div class="stat-label">Pares Activos</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{avg_score}</div>
+                            <div class="stat-label">Score Promedio</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{current_hour}:00 UTC</div>
+                            <div class="stat-label">Hora Actual</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="status {'active' if status == '🟢 ACTIVO' else 'waiting'}">
-                {status}
-            </div>
-            
-            <div class="info">
-                <div class="metric">
-                    <div class="metric-value">{SYMBOL}</div>
-                    <div class="metric-label">Símbolo</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">${current_price:.2f}</div>
-                    <div class="metric-label">Precio Actual</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">{current_rsi:.1f}</div>
-                    <div class="metric-label">RSI</div>
-                </div>
-            </div>
-            
-            <div class="info">
-                <div class="metric">
-                    <div class="metric-value">{signal_count}</div>
-                    <div class="metric-label">Señales Enviadas</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">{last_signal or 'Ninguna'}</div>
-                    <div class="metric-label">Última Señal</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">{last_time}</div>
-                    <div class="metric-label">Último Análisis</div>
-                </div>
-            </div>
-            
-            <div class="info">
-                <p><strong>📧 Email:</strong> {email_status}</p>
-                <p><strong>⏱️ Intervalo:</strong> Análisis cada 60 segundos</p>
-                <p><strong>🔄 Auto-refresh:</strong> Página se actualiza cada 30 segundos</p>
-                <p><strong>{data_source}</strong></p>
+
+            <div class="footer">
+                <p>🔄 Auto-refresh cada 30 segundos • ⚡ Análisis cada 60 segundos</p>
+                <p>⚠️ Solo para fines educativos • Gestiona tu riesgo responsablemente</p>
             </div>
         </div>
     </body>
     </html>
     """
+
     return html
 
 @app.route("/status")
 def status():
     return jsonify({
         "status": "active" if bot_running else "starting",
-        "symbol": SYMBOL,
-        "current_price": current_price,
-        "current_rsi": current_rsi,
+        "symbols": SYMBOLS,
+        "market_data": market_data,
         "signal_count": signal_count,
-        "last_signal": last_signal,
         "last_analysis": last_analysis_time.isoformat() if last_analysis_time else None,
         "using_simulation": using_simulation,
-        "email_configured": all([EMAIL_FROM, EMAIL_PASSWORD, EMAIL_TO])
+        "email_configured": validate_config(),
+        "trading_hour": is_valid_trading_hour(),
+        "current_hour_utc": datetime.utcnow().hour
     })
 
 @app.route("/health")
@@ -352,29 +750,43 @@ def health():
 
 @app.route("/debug")
 def debug():
-    """Endpoint de debug para ver el estado interno del bot"""
-    global last_analysis_time, current_price, current_rsi, signal_count, last_signal, using_simulation, bot_running
+    """Endpoint de debug avanzado para el sistema multi-par"""
+    global last_analysis_time, signal_count, using_simulation, bot_running, market_data
+
+    # Calcular estadísticas
+    total_score = sum(data["score"] for data in market_data.values())
+    active_pairs = sum(1 for data in market_data.values() if data["price"] > 0)
+    avg_score = total_score // max(active_pairs, 1) if active_pairs > 0 else 0
 
     return jsonify({
         "bot_status": {
             "running": bot_running,
+            "version": VERSION,
             "last_analysis": last_analysis_time.isoformat() if last_analysis_time else None,
-            "analysis_age_seconds": (datetime.now() - last_analysis_time).total_seconds() if last_analysis_time else None
-        },
-        "market_data": {
-            "symbol": SYMBOL,
-            "current_price": current_price,
-            "current_rsi": current_rsi,
+            "analysis_age_seconds": (datetime.now() - last_analysis_time).total_seconds() if last_analysis_time else None,
             "using_simulation": using_simulation
         },
-        "signals": {
-            "count": signal_count,
-            "last_signal": last_signal
+        "symbols": SYMBOLS,
+        "market_data": market_data,
+        "statistics": {
+            "total_signals": signal_count,
+            "active_pairs": active_pairs,
+            "average_score": avg_score,
+            "trading_hour": is_valid_trading_hour(),
+            "current_hour_utc": datetime.utcnow().hour
         },
         "config": {
             "email_configured": validate_config(),
-            "interval": INTERVAL,
+            "intervals": {
+                "main": INTERVAL,
+                "confirmation_15m": INTERVAL_15M,
+                "macro_1h": INTERVAL_1H
+            },
             "analysis_interval_seconds": 60
+        },
+        "adaptive_params": {
+            symbol: get_adaptive_params(detect_pair_type(symbol))
+            for symbol in SYMBOLS
         },
         "timestamp": datetime.now().isoformat()
     })
@@ -410,8 +822,8 @@ def monitoring_loop():
     logger.info("🚀 HILO DE MONITOREO INICIADO")
     sys.stdout.flush()
 
-    logger.info("🚀 Iniciando bot de trading...")
-    logger.info(f"📊 Monitoreando {SYMBOL} cada 60 segundos")
+    logger.info("🚀 Iniciando bot de trading multi-par...")
+    logger.info(f"📊 Monitoreando {', '.join(SYMBOLS)} cada 60 segundos")
     sys.stdout.flush()
 
     email_configured = validate_config()
@@ -461,8 +873,8 @@ if __name__ == "__main__":
     logger.info("=" * 50)
 
     # Mostrar configuración
-    logger.info(f"📊 Símbolo: {SYMBOL}")
-    logger.info(f"⏰ Intervalo: {INTERVAL}")
+    logger.info(f"📊 Símbolos: {', '.join(SYMBOLS)}")
+    logger.info(f"⏰ Intervalos: {INTERVAL}, {INTERVAL_15M}, {INTERVAL_1H}")
     logger.info(f"📧 Email configurado: {validate_config()}")
 
     # Obtener puerto de Render
