@@ -61,7 +61,7 @@ logger.info("📦 Importaciones completadas")
 logger.info("🔧 Iniciando configuración...")
 
 # === CONFIGURACIÓN ===
-VERSION = "v4.1-OPTIMIZED"
+VERSION = "v4.2-PROFESSIONAL-EMAILS"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -187,16 +187,27 @@ def validate_config():
     return True
 
 # === Envío de email ===
-def send_email(subject, body):
+def send_email(subject, body, html_body=None):
+    """Envía email con diseño profesional HTML"""
     if not all([EMAIL_FROM, EMAIL_PASSWORD, EMAIL_TO]):
         logger.warning("Configuración de email incompleta. No se enviará notificación.")
         return False
-        
+
     try:
-        msg = MIMEText(body)
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart('alternative')
         msg["Subject"] = subject
         msg["From"] = EMAIL_FROM
         msg["To"] = EMAIL_TO
+
+        # Texto plano como fallback
+        msg.attach(MIMEText(body, 'plain'))
+
+        # HTML si está disponible
+        if html_body:
+            msg.attach(MIMEText(html_body, 'html'))
+
         server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         server.login(EMAIL_FROM, EMAIL_PASSWORD)
         server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
@@ -206,6 +217,116 @@ def send_email(subject, body):
     except Exception as e:
         logger.error(f"❌ Error enviando email: {e}")
         return False
+
+def create_professional_email(signal_type, symbol, price, rsi, rsi_15m, ema_fast, ema_slow, volume, vol_avg, confidence_score, atr_val, candle_change_percent, conditions):
+    """Crea email HTML profesional con % de vela"""
+
+    # Colores según el tipo de señal
+    if signal_type == "buy":
+        color = "#28a745"
+        emoji = "🟢"
+        action = "COMPRA"
+        bg_color = "#d4edda"
+    else:
+        color = "#dc3545"
+        emoji = "🔴"
+        action = "VENTA"
+        bg_color = "#f8d7da"
+
+    # Texto plano
+    plain_text = f"""
+{emoji} SEÑAL DE {action} - {symbol}
+
+💰 Precio: ${price:,.2f}
+📈 Cambio vela: {candle_change_percent:+.2f}%
+📊 RSI: {rsi:.1f} (15m: {rsi_15m:.1f})
+📈 EMA: {ema_fast:.2f} / {ema_slow:.2f}
+📦 Volumen: {volume:,.0f} (Avg: {vol_avg:,.0f})
+🎯 Score: {confidence_score}/100
+🛡️ ATR: {atr_val:.2f}
+⏰ Hora: {datetime.utcnow().strftime('%H:%M UTC')}
+
+Condiciones cumplidas:
+{chr(10).join([f"{'✅' if v else '❌'} {k}: {v}" for k, v in conditions.items()])}
+
+⚠️ Solo para fines educativos. Gestiona tu riesgo responsablemente.
+    """
+
+    # HTML profesional
+    html_text = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{ font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f8f9fa; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }}
+            .header {{ background: {color}; color: white; padding: 30px; text-align: center; }}
+            .header h1 {{ margin: 0; font-size: 28px; }}
+            .header p {{ margin: 10px 0 0 0; font-size: 16px; opacity: 0.9; }}
+            .content {{ padding: 30px; }}
+            .alert {{ background: {bg_color}; border-left: 5px solid {color}; padding: 20px; margin: 20px 0; border-radius: 5px; }}
+            .metrics {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin: 20px 0; }}
+            .metric {{ background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; }}
+            .metric-value {{ font-size: 24px; font-weight: bold; color: {color}; }}
+            .metric-label {{ font-size: 12px; color: #6c757d; margin-top: 5px; }}
+            .conditions {{ background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 20px 0; }}
+            .condition {{ margin: 8px 0; font-size: 14px; }}
+            .footer {{ background: #2c3e50; color: white; padding: 20px; text-align: center; font-size: 12px; }}
+            .candle-change {{ font-size: 20px; font-weight: bold; color: {color}; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>{emoji} SEÑAL DE {action}</h1>
+                <p>{symbol} • Scalping Bot PRO</p>
+            </div>
+
+            <div class="content">
+                <div class="alert">
+                    <strong>💰 Precio Actual: ${price:,.2f}</strong><br>
+                    <span class="candle-change">📈 Cambio Vela: {candle_change_percent:+.2f}%</span>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-value">{rsi:.1f}</div>
+                        <div class="metric-label">RSI (1m)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">{rsi_15m:.1f}</div>
+                        <div class="metric-label">RSI (15m)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">{volume:,.0f}</div>
+                        <div class="metric-label">Volumen</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value">{confidence_score}/100</div>
+                        <div class="metric-label">Score</div>
+                    </div>
+                </div>
+
+                <div class="conditions">
+                    <h3>📋 Condiciones Cumplidas:</h3>
+                    {chr(10).join([f'<div class="condition">{"✅" if v else "❌"} <strong>{k}:</strong> {v}</div>' for k, v in conditions.items()])}
+                </div>
+
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <strong>⚠️ Aviso:</strong> Esta señal es solo para fines educativos. Siempre gestiona tu riesgo responsablemente.
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>🤖 Scalping Bot PRO • ⏰ {datetime.utcnow().strftime('%H:%M UTC')} • 🛡️ ATR: {atr_val:.2f}</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    return plain_text.strip(), html_text
 
 # === Carga datos Binance ===
 def get_klines(symbol, interval, limit=100):
@@ -432,26 +553,28 @@ def analyze_symbol(symbol):
             signal_type = "STRONG BUY" if strong_buy else "BUY"
             logger.info(f"🟢 ¡SEÑAL DE {signal_type} DETECTADA para {symbol}!")
 
-            # Crear mensaje detallado
-            msg = f"""🟢 {signal_type} SIGNAL - {params['emoji']} {params['name']}
+            # Calcular % de cambio de la vela actual
+            open_price = float(data_1m[0][1])  # Precio de apertura de la vela actual
+            candle_change_percent = ((close_now - open_price) / open_price) * 100
 
-💰 Precio: ${close_now:.2f}
-📈 RSI: {rsi_1m:.2f} (15m: {rsi_15m:.2f})
-📊 EMA {params['ema_fast']}/{params['ema_slow']}: {ema_fast_val:.2f}/{ema_slow_val:.2f}
-📦 Volumen: {vol_now:,.0f} (Avg: {vol_avg:,.0f})
-🎯 Score: {confidence_score}/100
-🛡️ ATR: {atr_val:.2f}
-⏰ Hora: {datetime.utcnow().strftime('%H:%M UTC')}
+            # Condiciones para el email
+            conditions = {
+                "Cruce EMA": crossover_buy,
+                f"RSI {params['rsi_low']}-{params['rsi_high']}": f"{rsi_1m:.1f}",
+                "Volumen > Promedio": vol_now > vol_avg,
+                "RSI 15m > 50": f"{rsi_15m:.1f}",
+                "Macro Trend": macro_trend if pair_type == 'BTC' else 'N/A',
+                "Horario Trading": is_valid_trading_hour()
+            }
 
-Condiciones:
-✅ Cruce EMA: {crossover_buy}
-✅ RSI: {params['rsi_low']}-{params['rsi_high']} ({rsi_1m:.1f})
-✅ Volumen: {vol_now > vol_avg}
-✅ RSI 15m: {rsi_15m > 50} ({rsi_15m:.1f})
-✅ Macro Trend: {macro_trend if pair_type == 'BTC' else 'N/A'}
-✅ Horario: {is_valid_trading_hour()}"""
+            # Crear email profesional
+            plain_text, html_text = create_professional_email(
+                "buy", symbol, close_now, rsi_1m, rsi_15m,
+                ema_fast_val, ema_slow_val, vol_now, vol_avg,
+                confidence_score, atr_val, candle_change_percent, conditions
+            )
 
-            if send_email(f"🟢 {signal_type} - {symbol} Scalping Bot", msg):
+            if send_email(f"🟢 {signal_type} - {symbol} Scalping Bot", plain_text, html_text):
                 global signal_count
                 signal_count += 1
                 market_data[symbol]["last_signal"] = "buy"
@@ -463,26 +586,28 @@ Condiciones:
             signal_type = "STRONG SELL" if strong_sell else "SELL"
             logger.info(f"🔴 ¡SEÑAL DE {signal_type} DETECTADA para {symbol}!")
 
-            # Crear mensaje detallado
-            msg = f"""🔴 {signal_type} SIGNAL - {params['emoji']} {params['name']}
+            # Calcular % de cambio de la vela actual
+            open_price = float(data_1m[0][1])  # Precio de apertura de la vela actual
+            candle_change_percent = ((close_now - open_price) / open_price) * 100
 
-💰 Precio: ${close_now:.2f}
-📈 RSI: {rsi_1m:.2f} (15m: {rsi_15m:.2f})
-📊 EMA {params['ema_fast']}/{params['ema_slow']}: {ema_fast_val:.2f}/{ema_slow_val:.2f}
-📦 Volumen: {vol_now:,.0f} (Avg: {vol_avg:,.0f})
-🎯 Score: {confidence_score}/100
-🛡️ ATR: {atr_val:.2f}
-⏰ Hora: {datetime.utcnow().strftime('%H:%M UTC')}
+            # Condiciones para el email
+            conditions = {
+                "Cruce EMA": crossunder_sell,
+                "RSI 35-55": f"{rsi_1m:.1f}",
+                "Volumen > Promedio": vol_now > vol_avg,
+                "RSI 15m < 50": f"{rsi_15m:.1f}",
+                "Macro Trend": not macro_trend if pair_type == 'BTC' else 'N/A',
+                "Horario Trading": is_valid_trading_hour()
+            }
 
-Condiciones:
-✅ Cruce EMA: {crossunder_sell}
-✅ RSI: 35-55 ({rsi_1m:.1f})
-✅ Volumen: {vol_now > vol_avg}
-✅ RSI 15m: {rsi_15m < 50} ({rsi_15m:.1f})
-✅ Macro Trend: {not macro_trend if pair_type == 'BTC' else 'N/A'}
-✅ Horario: {is_valid_trading_hour()}"""
+            # Crear email profesional
+            plain_text, html_text = create_professional_email(
+                "sell", symbol, close_now, rsi_1m, rsi_15m,
+                ema_fast_val, ema_slow_val, vol_now, vol_avg,
+                confidence_score, atr_val, candle_change_percent, conditions
+            )
 
-            if send_email(f"🔴 {signal_type} - {symbol} Scalping Bot", msg):
+            if send_email(f"🔴 {signal_type} - {symbol} Scalping Bot", plain_text, html_text):
                 signal_count += 1
                 market_data[symbol]["last_signal"] = "sell"
                 logger.info(f"✅ Email {signal_type} enviado - {symbol} - Señal #{signal_count}")
