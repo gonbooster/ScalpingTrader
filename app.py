@@ -239,9 +239,13 @@ if __name__ == "__main__":
     logger.info(f"🌐 Iniciando servidor Flask en puerto {PORT}")
     
     # Iniciar bot automáticamente
+    logger.info("🔄 Preparando thread de trading...")
     if not bot_running:
+        logger.info("🚀 Iniciando thread de trading...")
         bot_thread = threading.Thread(target=trading_loop, daemon=True)
         bot_thread.start()
+        logger.info("✅ Thread de trading iniciado")
     
     # Iniciar servidor Flask
+    logger.info("🌐 Iniciando servidor Flask...")
     app.run(host="0.0.0.0", port=PORT, debug=False)
