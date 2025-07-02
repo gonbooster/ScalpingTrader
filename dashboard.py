@@ -16,13 +16,19 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         status = "🟡 INICIANDO"
         data_source = "Conectando..."
     
-    last_time = last_analysis_time.strftime('%H:%M:%S') if last_analysis_time else "N/A"
+    # Formato de tiempo más claro
+    if last_analysis_time:
+        now = datetime.now()
+        time_diff = (now - last_analysis_time).total_seconds()
+        if time_diff < 60:
+            last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {int(time_diff)}s)"
+        else:
+            last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {int(time_diff/60)}m)"
+    else:
+        last_time = "N/A"
     
     # Generar cards de criptomonedas
     crypto_cards = generate_crypto_cards(market_data, last_signals)
-    
-    # Generar estadísticas
-    stats_section = generate_stats_section(market_data, signal_count)
     
     # HTML completo
     html = f"""
@@ -63,8 +69,6 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
             <div class="crypto-grid">
                 {crypto_cards}
             </div>
-
-            {stats_section}
 
             <div class="footer">
                 <p>🤖 Scalping Bot PRO • ⚠️ Solo para fines educativos</p>
@@ -228,35 +232,7 @@ def generate_crypto_cards(market_data, last_signals):
     
     return crypto_cards
 
-def generate_stats_section(market_data, signal_count):
-    """Genera la sección de estadísticas"""
-    # Calcular estadísticas
-    total_pairs = len(market_data)
-    avg_score = sum(data.get('score', 0) for data in market_data.values()) / total_pairs if total_pairs > 0 else 0
-    
-    return f"""
-    <div class="stats-section">
-        <h2>📊 Estadísticas del Sistema</h2>
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-value">{signal_count}</div>
-                <div class="stat-label">Señales</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{total_pairs}</div>
-                <div class="stat-label">Pares</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">{avg_score:.0f}/100</div>
-                <div class="stat-label">Score</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value">60s</div>
-                <div class="stat-label">Análisis</div>
-            </div>
-        </div>
-    </div>
-    """
+# Función generate_stats_section eliminada - sección de estadísticas removida
 
 def get_dashboard_css():
     """Retorna el CSS del dashboard"""
@@ -312,18 +288,18 @@ def get_dashboard_css():
         .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
         .metric { background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #475569; }
         .metric-value { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }
-        .metric-label { font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }
+        .metric-label { font-size: 0.8rem; color: #f1f5f9; margin-top: 4px; font-weight: 500; }
         .trading-scenarios { margin-bottom: 15px; padding: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid #334155; }
-        .scenario-title { font-size: 0.9rem; font-weight: 600; color: #94a3b8; margin-bottom: 12px; text-align: center; }
+        .scenario-title { font-size: 0.9rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; text-align: center; }
         .scenario { margin-bottom: 12px; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
         .buy-scenario { background: rgba(34, 197, 94, 0.05); border-color: rgba(34, 197, 94, 0.2); }
         .sell-scenario { background: rgba(239, 68, 68, 0.05); border-color: rgba(239, 68, 68, 0.2); }
         .scenario-header { font-size: 0.8rem; font-weight: 600; margin-bottom: 8px; color: #f1f5f9; text-align: center; }
         .scenario-targets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .target { text-align: center; padding: 6px; border-radius: 6px; }
-        .target-label { font-size: 0.7rem; color: #94a3b8; display: block; }
+        .target-label { font-size: 0.7rem; color: #f1f5f9; display: block; font-weight: 500; }
         .target-value { font-size: 0.85rem; font-weight: 600; color: #f1f5f9; display: block; }
-        .target-percent { font-size: 0.65rem; color: #60a5fa; display: block; }
+        .target-percent { font-size: 0.65rem; color: #60a5fa; display: block; font-weight: 500; }
         .target.profit { background: rgba(34, 197, 94, 0.1); }
         .target.loss { background: rgba(239, 68, 68, 0.1); }
         .signal-status { padding: 12px; border-radius: 10px; text-align: center; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; }
@@ -340,15 +316,10 @@ def get_dashboard_css():
         .email-indicator {
             text-align: center; padding: 8px 12px; border-radius: 8px;
             font-weight: 600; margin-bottom: 15px; font-size: 0.85rem;
-            background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);
+            background: rgba(59, 130, 246, 0.15); color: #f1f5f9; border: 1px solid rgba(59, 130, 246, 0.4);
         }
-        .threshold { font-size: 0.75rem; opacity: 0.8; }
-        .stats-section { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 25px; border-radius: 12px; border: 1px solid #475569; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
-        .stats-section h2 { color: #f1f5f9; margin-bottom: 20px; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
-        .stat-card { text-align: center; padding: 18px; background: rgba(30, 41, 59, 0.6); border-radius: 10px; border: 1px solid #475569; }
-        .stat-value { font-size: 1.6rem; font-weight: 700; color: #34d399; }
-        .stat-label { font-size: 0.85rem; color: #94a3b8; margin-top: 6px; }
+        .threshold { font-size: 0.75rem; opacity: 0.9; color: #94a3b8; }
+
         .footer { text-align: center; margin-top: 25px; color: #64748b; font-size: 0.85rem; }
         .update-indicator { position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 10px 18px; border-radius: 25px; font-size: 0.85rem; opacity: 0; transition: all 0.3s ease; z-index: 1000; }
         .update-indicator.show { opacity: 1; }
@@ -378,6 +349,16 @@ def get_dashboard_js():
                 updateElement(`[data-rsi="${symbol}"]`, symbolData.rsi?.toFixed(1));
                 updateElement(`[data-score="${symbol}"]`, `${symbolData.score}/100`);
             });
+
+            // Actualizar timestamp si está disponible
+            if (data.bot_status?.last_analysis) {
+                const lastTime = new Date(data.bot_status.last_analysis);
+                const now = new Date();
+                const diffSeconds = Math.floor((now - lastTime) / 1000);
+                const timeStr = lastTime.toLocaleTimeString();
+                const agoStr = diffSeconds < 60 ? `hace ${diffSeconds}s` : `hace ${Math.floor(diffSeconds/60)}m`;
+                updateElement('.status-item:nth-child(5)', `<strong>Último:</strong> ${timeStr} (${agoStr})`);
+            }
         }
         
         function updateElement(selector, value) {
