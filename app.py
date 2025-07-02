@@ -812,6 +812,61 @@ def test():
             "timestamp": datetime.now().isoformat()
         })
 
+@app.route("/test-email")
+def test_email():
+    """Endpoint para enviar email de prueba"""
+    logger.info("📧 TEST: Enviando email de prueba...")
+
+    try:
+        # Crear mensaje de prueba
+        test_message = f"""🧪 EMAIL DE PRUEBA - Scalping Bot
+
+✅ ¡Tu bot está funcionando correctamente!
+
+🤖 Estado: Activo y monitoreando
+📊 Pares: BTC, ETH, SOL
+⏰ Hora de prueba: {datetime.now().strftime('%H:%M:%S')}
+📡 Conexión: Binance API funcionando
+📧 Email: Sistema configurado correctamente
+
+🎯 Próximos pasos:
+- El bot analizará cada 60 segundos
+- Recibirás emails cuando detecte señales válidas
+- Dashboard disponible en http://localhost:5000
+
+⚠️ Este es un email de prueba. Los emails reales incluirán:
+- Precio exacto de entrada
+- Análisis técnico completo
+- Score de confianza
+- Condiciones del mercado
+
+¡Tu bot está listo para detectar oportunidades! 🚀"""
+
+        # Enviar email
+        if send_email("🧪 TEST - Scalping Bot Funcionando", test_message):
+            logger.info("✅ Email de prueba enviado exitosamente")
+            return jsonify({
+                "test_result": "success",
+                "message": "Email de prueba enviado correctamente",
+                "email_to": EMAIL_TO,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            logger.error("❌ Error enviando email de prueba")
+            return jsonify({
+                "test_result": "failed",
+                "message": "Error enviando email de prueba",
+                "timestamp": datetime.now().isoformat()
+            })
+
+    except Exception as e:
+        logger.error(f"❌ Error en test de email: {e}")
+        return jsonify({
+            "test_result": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
 # === Loop de monitoreo ===
 def monitoring_loop():
     global bot_running

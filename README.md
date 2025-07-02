@@ -162,3 +162,10 @@ Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más det
 ---
 
 **⚠️ Disclaimer**: Este software es solo para fines educativos. El trading de criptomonedas conlleva riesgos significativos. Nunca inviertas más de lo que puedes permitirte perder.
+
+
+# Navegar a tu proyecto
+cd "C:\Users\gonza\Documents\augment-projects\ScalpingTrader"
+
+# Configurar variables de entorno y ejecutar
+$env:EMAIL_FROM="gonzalodelpalacio@gmail.com"; $env:EMAIL_PASSWORD="uxvbzhyrkqerrrtz"; $env:EMAIL_TO="gonzalodelpalacio@gmail.com"; & "C:\Users\gonza\AppData\Local\Programs\Python\Python313\python.exe" app.py
