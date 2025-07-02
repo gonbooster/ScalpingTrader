@@ -39,8 +39,12 @@ logger.info("🚀 SISTEMA DE LOGS INICIADO")
 logger.info(f"📝 Archivo de logs: {log_file}")
 logger.info("=" * 60)
 
+# Logs inmediatos para debugging
+logger.info("📦 Importaciones completadas")
+logger.info("🔧 Iniciando configuración...")
+
 # === CONFIGURACIÓN ===
-VERSION = "v3.2-DEBUG-LOGS"
+VERSION = "v3.3-TRACE-LOGS"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -64,6 +68,17 @@ signal_count = 0
 last_analysis_time = None
 using_simulation = False
 bot_running = False
+
+# === Logs de debugging después de definir variables ===
+logger.info("🔧 Variables definidas correctamente")
+logger.info(f"📧 EMAIL_FROM: {'✅' if EMAIL_FROM else '❌'}")
+logger.info(f"📧 EMAIL_PASSWORD: {'✅' if EMAIL_PASSWORD else '❌'}")
+logger.info(f"📧 EMAIL_TO: {'✅' if EMAIL_TO else '❌'}")
+logger.info(f"📊 SYMBOLS: {SYMBOLS}")
+logger.info(f"⏰ INTERVALS: {INTERVAL}, {INTERVAL_15M}, {INTERVAL_1H}")
+logger.info(f"📊 market_data keys: {list(market_data.keys())}")
+logger.info(f"🤖 bot_running: {bot_running}")
+logger.info("✅ Configuración inicial completada - definiendo funciones...")
 
 # === Funciones de detección de pares (como en Pine Script) ===
 def detect_pair_type(symbol):
@@ -887,6 +902,10 @@ def test_email():
             "timestamp": datetime.now().isoformat()
         })
 
+# === Logs después de definir todas las funciones ===
+logger.info("🔧 Todas las funciones definidas correctamente")
+logger.info("🔧 Definiendo rutas Flask...")
+
 @app.route("/logs")
 def view_logs():
     """Endpoint para ver los logs del bot"""
@@ -1060,6 +1079,11 @@ def monitoring_loop():
             logger.info("⏰ Esperando 60 segundos antes de reintentar...")
             time.sleep(60)
             cycle_count += 1
+
+# === Logs antes del main ===
+logger.info("🔧 Todas las rutas Flask definidas")
+logger.info("🔧 Llegando al punto de ejecución principal...")
+logger.info("🔧 Verificando si es __main__...")
 
 # === Inicio de la aplicación ===
 if __name__ == "__main__":
