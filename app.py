@@ -61,7 +61,7 @@ logger.info("📦 Importaciones completadas")
 logger.info("🔧 Iniciando configuración...")
 
 # === CONFIGURACIÓN ===
-VERSION = "v4.2-PROFESSIONAL-EMAILS"
+VERSION = "v4.4-ADVANCED-FILTERS"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -77,9 +77,9 @@ EMAIL_TO = os.getenv("EMAIL_TO")
 
 # Variables globales para múltiples pares
 market_data = {
-    "BTCUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0},
-    "ETHUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0},
-    "SOLUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0}
+    "BTCUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0, "last_signal_price": 0.0, "last_signal_time": 0},
+    "ETHUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0, "last_signal_price": 0.0, "last_signal_time": 0},
+    "SOLUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0, "last_signal_price": 0.0, "last_signal_time": 0}
 }
 signal_count = 0
 last_analysis_time = None
@@ -174,6 +174,44 @@ def calculate_confidence_score(symbol, rsi, rsi_15m, volume, vol_avg, ema_fast, 
 
     return min(score, 100)
 
+def calculate_price_targets(current_price, atr_value, signal_type, symbol):
+    """Calcula objetivos de precio basados en ATR y volatilidad"""
+
+    # Multiplicadores según el tipo de par
+    if symbol.startswith('BTC'):
+        atr_multiplier_tp = 2.5  # Take Profit más conservador para BTC
+        atr_multiplier_sl = 1.2  # Stop Loss más ajustado
+    elif symbol.startswith('ETH'):
+        atr_multiplier_tp = 2.8
+        atr_multiplier_sl = 1.3
+    else:  # SOL y otros
+        atr_multiplier_tp = 3.0  # Más agresivo para altcoins
+        atr_multiplier_sl = 1.5
+
+    if signal_type == "buy":
+        # Para BUY: esperamos subida
+        take_profit = current_price + (atr_value * atr_multiplier_tp)
+        stop_loss = current_price - (atr_value * atr_multiplier_sl)
+        expected_move_percent = ((take_profit - current_price) / current_price) * 100
+        risk_percent = ((current_price - stop_loss) / current_price) * 100
+    else:
+        # Para SELL: esperamos bajada
+        take_profit = current_price - (atr_value * atr_multiplier_tp)
+        stop_loss = current_price + (atr_value * atr_multiplier_sl)
+        expected_move_percent = ((current_price - take_profit) / current_price) * 100
+        risk_percent = ((stop_loss - current_price) / current_price) * 100
+
+    # Risk/Reward ratio
+    risk_reward_ratio = expected_move_percent / risk_percent if risk_percent > 0 else 0
+
+    return {
+        "take_profit": take_profit,
+        "stop_loss": stop_loss,
+        "expected_move_percent": expected_move_percent,
+        "risk_percent": risk_percent,
+        "risk_reward_ratio": risk_reward_ratio
+    }
+
 # === Validación de configuración ===
 def validate_config():
     """Valida que todas las variables de entorno necesarias estén configuradas"""
@@ -218,7 +256,7 @@ def send_email(subject, body, html_body=None):
         logger.error(f"❌ Error enviando email: {e}")
         return False
 
-def create_professional_email(signal_type, symbol, price, rsi, rsi_15m, ema_fast, ema_slow, volume, vol_avg, confidence_score, atr_val, candle_change_percent, conditions):
+def create_professional_email(signal_type, symbol, price, rsi, rsi_15m, ema_fast, ema_slow, volume, vol_avg, confidence_score, atr_val, candle_change_percent, conditions, price_targets=None):
     """Crea email HTML profesional con % de vela"""
 
     # Colores según el tipo de señal
@@ -248,6 +286,11 @@ def create_professional_email(signal_type, symbol, price, rsi, rsi_15m, ema_fast
 
 Condiciones cumplidas:
 {chr(10).join([f"{'✅' if v else '❌'} {k}: {v}" for k, v in conditions.items()])}
+
+🎯 OBJETIVOS DE PRECIO:
+{f'''🟢 Take Profit: ${price_targets["take_profit"]:,.2f} (+{price_targets["expected_move_percent"]:.1f}%)
+🔴 Stop Loss: ${price_targets["stop_loss"]:,.2f} (-{price_targets["risk_percent"]:.1f}%)
+⚖️ Risk/Reward: 1:{price_targets["risk_reward_ratio"]:.1f}''' if price_targets else 'No calculado'}
 
 ⚠️ Solo para fines educativos. Gestiona tu riesgo responsablemente.
     """
@@ -312,6 +355,27 @@ Condiciones cumplidas:
                     <h3>📋 Condiciones Cumplidas:</h3>
                     {chr(10).join([f'<div class="condition">{"✅" if v else "❌"} <strong>{k}:</strong> {v}</div>' for k, v in conditions.items()])}
                 </div>
+
+                {f'''<div style="background: #e8f5e8; border: 2px solid {color}; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <h3 style="color: {color}; margin-top: 0;">🎯 OBJETIVOS DE PRECIO</h3>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0;">
+                        <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
+                            <div style="font-size: 18px; font-weight: bold; color: #28a745;">🟢 Take Profit</div>
+                            <div style="font-size: 16px; margin: 5px 0;">${price_targets["take_profit"]:,.2f}</div>
+                            <div style="font-size: 14px; color: #28a745;">+{price_targets["expected_move_percent"]:.1f}%</div>
+                        </div>
+                        <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
+                            <div style="font-size: 18px; font-weight: bold; color: #dc3545;">🔴 Stop Loss</div>
+                            <div style="font-size: 16px; margin: 5px 0;">${price_targets["stop_loss"]:,.2f}</div>
+                            <div style="font-size: 14px; color: #dc3545;">-{price_targets["risk_percent"]:.1f}%</div>
+                        </div>
+                        <div style="text-align: center; padding: 10px; background: white; border-radius: 8px;">
+                            <div style="font-size: 18px; font-weight: bold; color: #6c757d;">⚖️ Risk/Reward</div>
+                            <div style="font-size: 16px; margin: 5px 0;">1:{price_targets["risk_reward_ratio"]:.1f}</div>
+                            <div style="font-size: 14px; color: #6c757d;">Ratio</div>
+                        </div>
+                    </div>
+                </div>''' if price_targets else ''}
 
                 <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
                     <strong>⚠️ Aviso:</strong> Esta señal es solo para fines educativos. Siempre gestiona tu riesgo responsablemente.
@@ -400,7 +464,7 @@ def rsi(prices, period=14):
     return 100 - (100 / (1 + rs))
 
 def atr(highs, lows, closes, period=14):
-    """Calcula Average True Range"""
+    """Calcula Average True Range con suavizado exponencial (como TradingView)"""
     if len(highs) < 2:
         return 0.0
 
@@ -409,7 +473,130 @@ def atr(highs, lows, closes, period=14):
     tr3 = np.abs(lows[1:] - closes[:-1])
 
     true_range = np.maximum(tr1, np.maximum(tr2, tr3))
-    return np.mean(true_range[-period:]) if len(true_range) >= period else np.mean(true_range)
+
+    if len(true_range) < period:
+        return np.mean(true_range)
+
+    # ATR con suavizado exponencial
+    alpha = 2.0 / (period + 1)
+    atr_value = np.mean(true_range[:period])  # Primer valor como SMA
+
+    for i in range(period, len(true_range)):
+        atr_value = alpha * true_range[i] + (1 - alpha) * atr_value
+
+    return atr_value
+
+def calculate_adx(highs, lows, closes, period=14):
+    """Calcula ADX para detectar tendencia vs lateralidad"""
+    if len(highs) < period + 1:
+        return 0.0
+
+    # Directional Movement
+    dm_plus = np.maximum(highs[1:] - highs[:-1], 0)
+    dm_minus = np.maximum(lows[:-1] - lows[1:], 0)
+
+    # True Range
+    tr1 = highs[1:] - lows[1:]
+    tr2 = np.abs(highs[1:] - closes[:-1])
+    tr3 = np.abs(lows[1:] - closes[:-1])
+    true_range = np.maximum(tr1, np.maximum(tr2, tr3))
+
+    # Smoothed values
+    alpha = 1.0 / period
+
+    if len(true_range) < period:
+        return 0.0
+
+    # Initialize
+    atr_smooth = np.mean(true_range[:period])
+    di_plus = np.mean(dm_plus[:period]) / atr_smooth * 100 if atr_smooth > 0 else 0
+    di_minus = np.mean(dm_minus[:period]) / atr_smooth * 100 if atr_smooth > 0 else 0
+
+    # Calculate ADX
+    dx_values = []
+    for i in range(period, len(true_range)):
+        atr_smooth = alpha * true_range[i] + (1 - alpha) * atr_smooth
+        di_plus = alpha * dm_plus[i] + (1 - alpha) * di_plus
+        di_minus = alpha * dm_minus[i] + (1 - alpha) * di_minus
+
+        dx = abs(di_plus - di_minus) / (di_plus + di_minus) * 100 if (di_plus + di_minus) > 0 else 0
+        dx_values.append(dx)
+
+    # ADX is smoothed DX
+    adx = np.mean(dx_values[-period:]) if len(dx_values) >= period else 0
+    return adx
+
+def validate_breakout_candle(data, signal_type):
+    """Valida que la vela de ruptura tenga características fuertes"""
+    if len(data) < 2:
+        return False
+
+    current_candle = data[-1]
+    open_price = float(current_candle[1])
+    high_price = float(current_candle[2])
+    low_price = float(current_candle[3])
+    close_price = float(current_candle[4])
+    volume = float(current_candle[5])
+
+    # Calcular volumen promedio de las últimas 10 velas
+    volumes = [float(x[5]) for x in data[-10:]]
+    avg_volume = np.mean(volumes)
+
+    # Rango de la vela
+    candle_range = high_price - low_price
+    body_size = abs(close_price - open_price)
+
+    # Validaciones
+    volume_check = volume > avg_volume * 1.2  # Volumen 20% superior
+    body_dominance = body_size / candle_range > 0.6 if candle_range > 0 else False  # Cuerpo dominante
+
+    if signal_type == "buy":
+        # Para BUY: vela verde que cierre en el 60% superior
+        green_candle = close_price > open_price
+        upper_close = (close_price - low_price) / candle_range > 0.6 if candle_range > 0 else False
+        return volume_check and body_dominance and green_candle and upper_close
+    else:
+        # Para SELL: vela roja que cierre en el 60% inferior
+        red_candle = close_price < open_price
+        lower_close = (high_price - close_price) / candle_range > 0.6 if candle_range > 0 else False
+        return volume_check and body_dominance and red_candle and lower_close
+
+def check_signal_distance(symbol, current_price, signal_type):
+    """Verifica distancia mínima entre señales para evitar lateralidad"""
+    if symbol not in market_data:
+        return True
+
+    last_signal = market_data[symbol].get("last_signal")
+    last_price = market_data[symbol].get("last_signal_price", 0)
+    last_time = market_data[symbol].get("last_signal_time", 0)
+
+    current_time = time.time()
+
+    # Filtro de tiempo: mínimo 5 minutos entre señales
+    if last_time > 0 and (current_time - last_time) < 300:  # 5 minutos
+        return False
+
+    # Filtro de precio: mínimo 1% de movimiento
+    if last_price > 0:
+        price_change_percent = abs((current_price - last_price) / last_price) * 100
+        if price_change_percent < 1.0:  # Menos de 1% de movimiento
+            return False
+
+    # Evitar señales opuestas inmediatas (BUY→SELL→BUY)
+    if last_signal and last_signal != signal_type:
+        if (current_time - last_time) < 600:  # 10 minutos para señales opuestas
+            return False
+
+    return True
+
+def update_signal_tracking(symbol, signal_type, price):
+    """Actualiza el tracking de señales para filtrado"""
+    if symbol not in market_data:
+        return
+
+    market_data[symbol]["last_signal"] = signal_type
+    market_data[symbol]["last_signal_price"] = price
+    market_data[symbol]["last_signal_time"] = time.time()
 
 # === Bot principal multi-par ===
 def analyze_symbol(symbol):
@@ -455,6 +642,9 @@ def analyze_symbol(symbol):
         # ATR para stop-loss dinámico
         atr_val = atr(highs_1m, lows_1m, closes_1m)
 
+        # ADX para detectar tendencia vs lateralidad
+        adx_val = calculate_adx(highs_1m, lows_1m, closes_1m)
+
         # Volumen
         vol_now = volumes_1m[-1]
         vol_avg = np.mean(volumes_1m[-20:])
@@ -481,7 +671,7 @@ def analyze_symbol(symbol):
         logger.info(f"📈 RSI: {rsi_1m:.2f} (15m: {rsi_15m:.2f})")
         logger.info(f"📊 EMA {params['ema_fast']}/{params['ema_slow']}: {ema_fast_val:.2f}/{ema_slow_val:.2f}")
         logger.info(f"📦 Volumen: {vol_now:,.0f} (Avg: {vol_avg:,.0f})")
-        logger.info(f"🎯 ATR: {atr_val:.2f}, Macro: {macro_trend}")
+        logger.info(f"🎯 ATR: {atr_val:.2f}, ADX: {adx_val:.1f}, Macro: {macro_trend}")
 
         # Evaluar condiciones de señales (como en tu script Pine)
         logger.info("🔍 Evaluando condiciones de trading...")
@@ -546,10 +736,26 @@ def analyze_symbol(symbol):
         logger.info(f"📊 Score de confianza: {confidence_score}/100")
         logger.info(f"📝 Última señal {symbol}: {market_data[symbol]['last_signal']}")
 
-        # Procesar señales
+        # Procesar señales con filtros avanzados
         current_signal = market_data[symbol]["last_signal"]
 
-        if (buy_signal or strong_buy) and current_signal != "buy":
+        # FILTROS ANTI-LATERALIDAD
+        # 1. ADX mínimo para evitar lateralidad
+        adx_filter = adx_val > 20  # ADX > 20 indica tendencia
+
+        # 2. Validación de vela de ruptura
+        breakout_buy = validate_breakout_candle(data_1m, "buy") if (buy_signal or strong_buy) else True
+        breakout_sell = validate_breakout_candle(data_1m, "sell") if (sell_signal or strong_sell) else True
+
+        # 3. Distancia mínima entre señales
+        distance_buy = check_signal_distance(symbol, close_now, "buy") if (buy_signal or strong_buy) else True
+        distance_sell = check_signal_distance(symbol, close_now, "sell") if (sell_signal or strong_sell) else True
+
+        logger.info(f"🔍 FILTROS - ADX: {adx_val:.1f} ({'✅' if adx_filter else '❌'})")
+        logger.info(f"🔍 FILTROS - Breakout BUY: {'✅' if breakout_buy else '❌'}, SELL: {'✅' if breakout_sell else '❌'}")
+        logger.info(f"🔍 FILTROS - Distancia BUY: {'✅' if distance_buy else '❌'}, SELL: {'✅' if distance_sell else '❌'}")
+
+        if (buy_signal or strong_buy) and current_signal != "buy" and adx_filter and breakout_buy and distance_buy:
             signal_type = "STRONG BUY" if strong_buy else "BUY"
             logger.info(f"🟢 ¡SEÑAL DE {signal_type} DETECTADA para {symbol}!")
 
@@ -567,22 +773,26 @@ def analyze_symbol(symbol):
                 "Horario Trading": is_valid_trading_hour()
             }
 
+            # Calcular objetivos de precio
+            price_targets = calculate_price_targets(close_now, atr_val, "buy", symbol)
+
             # Crear email profesional
             plain_text, html_text = create_professional_email(
                 "buy", symbol, close_now, rsi_1m, rsi_15m,
                 ema_fast_val, ema_slow_val, vol_now, vol_avg,
-                confidence_score, atr_val, candle_change_percent, conditions
+                confidence_score, atr_val, candle_change_percent, conditions, price_targets
             )
 
             if send_email(f"🟢 {signal_type} - {symbol} Scalping Bot", plain_text, html_text):
                 global signal_count
                 signal_count += 1
                 market_data[symbol]["last_signal"] = "buy"
+                update_signal_tracking(symbol, "buy", close_now)  # Tracking avanzado
                 logger.info(f"✅ Email {signal_type} enviado - {symbol} - Señal #{signal_count}")
             else:
                 logger.error(f"❌ Error enviando email {signal_type} - {symbol}")
 
-        elif (sell_signal or strong_sell) and current_signal != "sell":
+        elif (sell_signal or strong_sell) and current_signal != "sell" and adx_filter and breakout_sell and distance_sell:
             signal_type = "STRONG SELL" if strong_sell else "SELL"
             logger.info(f"🔴 ¡SEÑAL DE {signal_type} DETECTADA para {symbol}!")
 
@@ -600,16 +810,20 @@ def analyze_symbol(symbol):
                 "Horario Trading": is_valid_trading_hour()
             }
 
+            # Calcular objetivos de precio
+            price_targets = calculate_price_targets(close_now, atr_val, "sell", symbol)
+
             # Crear email profesional
             plain_text, html_text = create_professional_email(
                 "sell", symbol, close_now, rsi_1m, rsi_15m,
                 ema_fast_val, ema_slow_val, vol_now, vol_avg,
-                confidence_score, atr_val, candle_change_percent, conditions
+                confidence_score, atr_val, candle_change_percent, conditions, price_targets
             )
 
             if send_email(f"🔴 {signal_type} - {symbol} Scalping Bot", plain_text, html_text):
                 signal_count += 1
                 market_data[symbol]["last_signal"] = "sell"
+                update_signal_tracking(symbol, "sell", close_now)  # Tracking avanzado
                 logger.info(f"✅ Email {signal_type} enviado - {symbol} - Señal #{signal_count}")
             else:
                 logger.error(f"❌ Error enviando email {signal_type} - {symbol}")
@@ -1138,8 +1352,8 @@ def initialize_bot():
     except Exception as e:
         logger.error(f"❌ Error validando email: {e}")
 
-    # Obtener puerto de Render
-    port = int(os.environ.get("PORT", 5000))
+    # Obtener puerto (Koyeb usa 8000, Render usa PORT)
+    port = int(os.environ.get("PORT", 8000))
     logger.info(f"🌐 Puerto configurado: {port}")
 
     # Para Render: usar un enfoque más simple sin hilos complejos
