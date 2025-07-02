@@ -81,6 +81,13 @@ market_data = {
     "ETHUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0, "last_signal_price": 0.0, "last_signal_time": 0},
     "SOLUSDT": {"price": 0.0, "rsi": 0.0, "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0, "last_signal_price": 0.0, "last_signal_time": 0}
 }
+
+# Variables globales adicionales
+last_signals = {}
+signal_count = 0
+bot_running = False
+last_analysis_time = None
+using_simulation = False
 signal_count = 0
 last_analysis_time = None
 using_simulation = False
@@ -722,10 +729,31 @@ def analyze_symbol(symbol):
             ema_fast_val, ema_slow_val, macro_trend, pair_type
         )
 
-        # Actualizar datos del mercado
+        # Calcular % de cambio de vela actual
+        open_price = float(data_1m[0][1])  # Precio de apertura de la vela actual
+        candle_change_percent = ((close_now - open_price) / open_price) * 100
+
+        # Calcular price targets para mostrar en frontend
+        price_targets = calculate_price_targets(close_now, atr_val, "buy", symbol)
+
+        # Actualizar datos del mercado con estructura correcta + nuevos datos
         market_data[symbol].update({
+            "price": close_now,
+            "rsi": rsi_1m,
+            "rsi_1m": rsi_1m,
+            "rsi_15m": rsi_15m,
+            "ema_fast": ema_fast_val,
+            "ema_slow": ema_slow_val,
+            "volume": vol_now,
+            "vol_avg": vol_avg,
             "score": confidence_score,
-            "atr": atr_val
+            "confidence_score": confidence_score,
+            "atr": atr_val,
+            "candle_change_percent": candle_change_percent,
+            "take_profit": price_targets["take_profit"],
+            "stop_loss": price_targets["stop_loss"],
+            "expected_move_percent": price_targets["expected_move_percent"],
+            "risk_reward_ratio": price_targets["risk_reward_ratio"]
         })
 
         # Log detallado de condiciones
@@ -908,56 +936,95 @@ def home():
 
     # Calcular estadísticas
     active_pairs = len([s for s in market_data.values() if s.get('price', 0) > 0])
-    total_score = sum([s.get('confidence_score', 0) for s in market_data.values()])
+    total_score = sum([s.get('score', 0) for s in market_data.values()])
     avg_score = f"{total_score // max(active_pairs, 1)}/100" if active_pairs > 0 else "0/100"
     status_class = "active" if status == "🟢 ACTIVO" else "waiting"
 
-    # Generar cards de criptos (limpio)
+    # Generar cards de criptos (limpio) - SOLO UNA VEZ
     crypto_cards = ""
     for symbol, data in market_data.items():
+        # DEBUG: Verificar datos
+        logger.info(f"🔍 DEBUG {symbol}: price={data.get('price', 0)}, rsi={data.get('rsi', 0)}")
+
         if not data.get('price', 0) > 0:
+            logger.warning(f"⚠️ {symbol} sin precio - saltando card")
             continue
 
         # Datos básicos
         name = symbol.replace('USDT', '')
         price = f"${data.get('price', 0):,.2f}"
-        rsi = data.get('rsi_1m', 0)
+        rsi = data.get('rsi', 0)
         rsi_15m = data.get('rsi_15m', 0)
-        score = data.get('confidence_score', 0)
+        score = data.get('score', 0)
+
+        # Nuevos datos del email
+        candle_change = data.get('candle_change_percent', 0)
+        vol_now = data.get('volume', 0)
+        vol_avg = data.get('vol_avg', 1)
+        take_profit = data.get('take_profit', 0)
+        stop_loss = data.get('stop_loss', 0)
+        expected_move = data.get('expected_move_percent', 0)
+        risk_reward = data.get('risk_reward_ratio', 0)
 
         # Señal actual
         signal = last_signals.get(symbol, {})
-        signal_type = signal.get('action', 'WAIT')
+        signal_type = signal.get('action', 'ESPERANDO')
         signal_class = f"signal-{signal_type.lower()}"
         signal_text = f"🎯 {signal_type}"
 
-        # Barra de confianza
+        # Clases de colores profesionales
         confidence_class = "confidence-low" if score < 40 else "confidence-medium" if score < 70 else "confidence-high"
+        candle_class = "positive" if candle_change > 0 else "negative" if candle_change < 0 else "neutral"
+        volume_class = "high-volume" if vol_now > vol_avg * 1.5 else "normal-volume"
+
+        # Color del símbolo según el tipo
+        symbol_color = "#f7931a" if name == "BTC" else "#627eea" if name == "ETH" else "#9945ff"
 
         crypto_cards += f"""
-        <div class="crypto-card" data-symbol="{symbol}">
+        <div class="crypto-card {name.lower()}" data-symbol="{symbol}" style="border-left: 4px solid {symbol_color};">
             <div class="crypto-header">
-                <div class="crypto-name">{name}</div>
+                <div class="crypto-name" style="color: {symbol_color};">
+                    <span class="crypto-icon">₿</span> {name}
+                </div>
                 <div class="crypto-price" data-price="{symbol}">{price}</div>
             </div>
+
+            <div class="candle-change {candle_class}" data-candle="{symbol}">
+                📈 Vela: {candle_change:+.2f}%
+            </div>
+
             <div class="metrics-grid">
-                <div class="metric">
+                <div class="metric rsi-metric">
                     <div class="metric-value" data-rsi="{symbol}">{rsi:.1f}</div>
                     <div class="metric-label">RSI 1m</div>
                 </div>
-                <div class="metric">
+                <div class="metric rsi-metric">
                     <div class="metric-value" data-rsi15="{symbol}">{rsi_15m:.1f}</div>
                     <div class="metric-label">RSI 15m</div>
                 </div>
-                <div class="metric">
+                <div class="metric volume-metric {volume_class}">
+                    <div class="metric-value" data-volume="{symbol}">{vol_now:,.0f}</div>
+                    <div class="metric-label">Volumen</div>
+                </div>
+                <div class="metric score-metric">
                     <div class="metric-value" data-score="{symbol}">{score}/100</div>
                     <div class="metric-label">Score</div>
                 </div>
-                <div class="metric">
-                    <div class="metric-value">60s</div>
-                    <div class="metric-label">Análisis</div>
+            </div>
+
+            <div class="trading-targets">
+                <div class="target take-profit">
+                    <span class="target-label">🎯 TP:</span>
+                    <span class="target-value" data-tp="{symbol}">${take_profit:,.2f}</span>
+                    <span class="target-percent">+{expected_move:.1f}%</span>
+                </div>
+                <div class="target stop-loss">
+                    <span class="target-label">🛡️ SL:</span>
+                    <span class="target-value" data-sl="{symbol}">${stop_loss:,.2f}</span>
+                    <span class="target-percent">R/R: 1:{risk_reward:.1f}</span>
                 </div>
             </div>
+
             <div class="signal-status {signal_class}" data-signal="{symbol}">
                 {signal_text}
             </div>
@@ -966,67 +1033,9 @@ def home():
             </div>
         </div>
         """
+        logger.info(f"✅ Card generada para {symbol}")
 
-    # Calcular estadísticas
-    active_pairs = len([s for s in market_data.values() if s.get('price', 0) > 0])
-    total_score = sum([s.get('confidence_score', 0) for s in market_data.values()])
-    avg_score = f"{total_score // max(active_pairs, 1)}/100" if active_pairs > 0 else "0/100"
-    status_class = "active" if status == "🟢 ACTIVO" else "waiting"
 
-    # Generar cards de criptos (limpio)
-    crypto_cards = ""
-    for symbol, data in market_data.items():
-        if not data.get('price', 0) > 0:
-            continue
-
-        # Datos básicos
-        name = symbol.replace('USDT', '')
-        price = f"${data.get('price', 0):,.2f}"
-        rsi = data.get('rsi_1m', 0)
-        rsi_15m = data.get('rsi_15m', 0)
-        score = data.get('confidence_score', 0)
-
-        # Señal actual
-        signal = last_signals.get(symbol, {})
-        signal_type = signal.get('action', 'WAIT')
-        signal_class = f"signal-{signal_type.lower()}"
-        signal_text = f"🎯 {signal_type}"
-
-        # Barra de confianza
-        confidence_class = "confidence-low" if score < 40 else "confidence-medium" if score < 70 else "confidence-high"
-
-        crypto_cards += f"""
-        <div class="crypto-card" data-symbol="{symbol}">
-            <div class="crypto-header">
-                <div class="crypto-name">{name}</div>
-                <div class="crypto-price" data-price="{symbol}">{price}</div>
-            </div>
-            <div class="metrics-grid">
-                <div class="metric">
-                    <div class="metric-value" data-rsi="{symbol}">{rsi:.1f}</div>
-                    <div class="metric-label">RSI 1m</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value" data-rsi15="{symbol}">{rsi_15m:.1f}</div>
-                    <div class="metric-label">RSI 15m</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value" data-score="{symbol}">{score}/100</div>
-                    <div class="metric-label">Score</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-value">60s</div>
-                    <div class="metric-label">Análisis</div>
-                </div>
-            </div>
-            <div class="signal-status {signal_class}" data-signal="{symbol}">
-                {signal_text}
-            </div>
-            <div class="confidence-bar">
-                <div class="confidence-fill {confidence_class}" style="width: {score}%"></div>
-            </div>
-        </div>
-        """
 
 
     # HTML limpio y responsive con auto-refresh dinámico
@@ -1041,53 +1050,123 @@ def home():
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             body {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #f5f5f5; color: #333; line-height: 1.6;
+                background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+                color: #e0e6ed; line-height: 1.6; min-height: 100vh;
             }}
-            .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
+            .container {{ max-width: 1400px; margin: 0 auto; padding: 20px; }}
             .header {{
-                background: #fff; padding: 20px; margin-bottom: 20px;
-                border-radius: 8px; border: 1px solid #e0e0e0;
+                background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                padding: 25px; margin-bottom: 25px; border-radius: 12px;
+                border: 1px solid #475569; box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             }}
-            .header h1 {{ font-size: 1.8rem; color: #333; margin-bottom: 5px; }}
-            .header p {{ color: #666; font-size: 0.9rem; }}
+            .header h1 {{
+                font-size: 2rem; color: #f1f5f9; margin-bottom: 8px;
+                background: linear-gradient(135deg, #60a5fa, #34d399);
+                -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }}
+            .header p {{ color: #94a3b8; font-size: 1rem; }}
             .status-bar {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 10px; margin-bottom: 20px;
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 15px; margin-bottom: 25px;
             }}
             .status-item {{
-                background: #fff; padding: 12px; border-radius: 6px;
-                border: 1px solid #e0e0e0; font-size: 0.85rem;
+                background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                padding: 15px; border-radius: 10px; border: 1px solid #475569;
+                font-size: 0.9rem; box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+                transition: transform 0.2s ease;
             }}
-            .status-active {{ border-left: 3px solid #22c55e; }}
-            .status-waiting {{ border-left: 3px solid #f59e0b; }}
+            .status-item:hover {{ transform: translateY(-2px); }}
+            .status-active {{ border-left: 4px solid #22c55e; }}
+            .status-waiting {{ border-left: 4px solid #f59e0b; }}
             .crypto-grid {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-                gap: 20px; margin-bottom: 20px;
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+                gap: 25px; margin-bottom: 25px;
             }}
             .crypto-card {{
-                background: #fff; padding: 20px; border-radius: 8px;
-                border: 1px solid #e0e0e0;
+                background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                padding: 25px; border-radius: 16px; border: 1px solid #475569;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                transition: all 0.3s ease; position: relative; overflow: hidden;
             }}
-            .crypto-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }}
-            .crypto-name {{ font-weight: 600; color: #333; }}
-            .crypto-price {{ font-weight: 700; color: #333; font-size: 1.2rem; }}
+            .crypto-card:hover {{
+                transform: translateY(-5px);
+                box-shadow: 0 12px 48px rgba(0,0,0,0.4);
+            }}
+            .crypto-card::before {{
+                content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+                background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+                opacity: 0.6;
+            }}
+            .crypto-header {{
+                display: flex; justify-content: space-between; align-items: center;
+                margin-bottom: 20px; padding-bottom: 15px;
+                border-bottom: 1px solid #475569;
+            }}
+            .crypto-name {{
+                font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; gap: 8px;
+                color: #f1f5f9;
+            }}
+            .crypto-icon {{ font-size: 1.2rem; }}
+            .crypto-price {{
+                font-size: 1.3rem; color: #34d399; font-weight: 700;
+                text-shadow: 0 0 10px rgba(52, 211, 153, 0.3);
+            }}
+            .candle-change {{
+                text-align: center; padding: 8px 12px; border-radius: 8px;
+                font-weight: 600; margin-bottom: 15px; font-size: 0.9rem;
+            }}
+            .candle-change.positive {{ background: rgba(34, 197, 94, 0.2); color: #22c55e; }}
+            .candle-change.negative {{ background: rgba(239, 68, 68, 0.2); color: #ef4444; }}
+            .candle-change.neutral {{ background: rgba(107, 114, 128, 0.2); color: #9ca3af; }}
             .metrics-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }}
-            .metric {{ background: #f8f9fa; padding: 10px; border-radius: 4px; text-align: center; }}
-            .metric-value {{ font-weight: 600; color: #333; }}
-            .metric-label {{ font-size: 0.8rem; color: #666; margin-top: 2px; }}
-            .signal-status {{ padding: 10px; border-radius: 4px; text-align: center; font-weight: 500; }}
-            .signal-buy {{ background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }}
-            .signal-sell {{ background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }}
-            .signal-wait {{ background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }}
-            .confidence-bar {{ width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; margin-top: 8px; }}
-            .confidence-fill {{ height: 100%; border-radius: 3px; transition: width 0.3s ease; }}
-            .confidence-low {{ background: #ef4444; }}
-            .confidence-medium {{ background: #f59e0b; }}
-            .confidence-high {{ background: #22c55e; }}
+            .metric {{
+                background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px;
+                text-align: center; border: 1px solid #475569;
+                transition: all 0.2s ease;
+            }}
+            .metric:hover {{ background: rgba(30, 41, 59, 0.8); }}
+            .metric-value {{ font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }}
+            .metric-label {{ font-size: 0.8rem; color: #94a3b8; margin-top: 4px; }}
+            .rsi-metric .metric-value {{ color: #60a5fa; }}
+            .volume-metric.high-volume .metric-value {{ color: #f59e0b; }}
+            .score-metric .metric-value {{ color: #34d399; }}
+            .trading-targets {{
+                display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+                margin-bottom: 15px; padding: 12px; background: rgba(15, 23, 42, 0.4);
+                border-radius: 10px; border: 1px solid #334155;
+            }}
+            .target {{ text-align: center; padding: 8px; border-radius: 6px; }}
+            .target-label {{ font-size: 0.75rem; color: #94a3b8; display: block; }}
+            .target-value {{ font-size: 0.9rem; font-weight: 600; color: #f1f5f9; display: block; }}
+            .target-percent {{ font-size: 0.7rem; color: #60a5fa; display: block; }}
+            .take-profit {{ background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); }}
+            .stop-loss {{ background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); }}
+            .signal-status {{
+                padding: 12px; border-radius: 10px; text-align: center;
+                font-weight: 700; margin-bottom: 12px; text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+            .signal-buy {{ background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }}
+            .signal-sell {{ background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }}
+            .signal-wait, .signal-esperando {{ background: linear-gradient(135deg, #6b7280, #4b5563); color: white; }}
+            .confidence-bar {{
+                background: rgba(15, 23, 42, 0.6); border-radius: 12px;
+                height: 10px; overflow: hidden; border: 1px solid #334155;
+            }}
+            .confidence-fill {{ height: 100%; transition: width 0.5s ease; }}
+            .confidence-low {{ background: linear-gradient(90deg, #ef4444, #f87171); }}
+            .confidence-medium {{ background: linear-gradient(90deg, #f59e0b, #fbbf24); }}
+            .confidence-high {{ background: linear-gradient(90deg, #22c55e, #34d399); }}
             .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; }}
-            .stat-card {{ background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; }}
-            .stat-value {{ font-weight: 700; color: #333; font-size: 1.4rem; }}
-            .stat-label {{ color: #666; font-size: 0.8rem; margin-top: 4px; }}
+            .stat-card {{
+                text-align: center; padding: 18px;
+                background: rgba(30, 41, 59, 0.6); border-radius: 10px;
+                border: 1px solid #475569; transition: transform 0.2s ease;
+            }}
+            .stat-card:hover {{ transform: translateY(-2px); }}
+            .stat-value {{ font-size: 1.6rem; font-weight: 700; color: #34d399; }}
+            .stat-label {{ font-size: 0.85rem; color: #94a3b8; margin-top: 6px; }}
             .footer {{ background: #fff; padding: 15px; margin-top: 20px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; font-size: 0.8rem; color: #666; }}
             .update-indicator {{ position: fixed; top: 20px; right: 20px; background: #22c55e; color: white; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; opacity: 0; transition: opacity 0.3s; }}
             .update-indicator.show {{ opacity: 1; }}
@@ -1160,9 +1239,9 @@ def home():
                         const scoreEl = document.querySelector(`[data-score="${{symbol}}"]`);
 
                         if (priceEl) priceEl.textContent = `$${{info.price?.toFixed(2) || '0.00'}}`;
-                        if (rsiEl) rsiEl.textContent = (info.rsi_1m || 0).toFixed(1);
+                        if (rsiEl) rsiEl.textContent = (info.rsi || 0).toFixed(1);
                         if (rsi15El) rsi15El.textContent = (info.rsi_15m || 0).toFixed(1);
-                        if (scoreEl) scoreEl.textContent = `${{info.confidence_score || 0}}/100`;
+                        if (scoreEl) scoreEl.textContent = `${{info.score || 0}}/100`;
                     }});
 
                     // Mostrar indicador de actualización
@@ -1273,6 +1352,9 @@ logger.info("🔧 Definiendo rutas Flask...")
 def view_logs():
     """Endpoint para ver los logs del bot"""
     try:
+        # Rotar logs antes de mostrar
+        rotate_logs()
+
         if os.path.exists("bot_logs.txt"):
             with open("bot_logs.txt", "r", encoding="utf-8") as f:
                 logs = f.read()
@@ -1384,9 +1466,10 @@ def monitoring_loop():
 
     while True:
         try:
-            # Rotar logs cada 10 ciclos para evitar saturación
-            if cycle_count % 10 == 0:
+            # Rotar logs cada 5 ciclos para evitar saturación
+            if cycle_count % 5 == 0:
                 rotate_logs()
+                logger.info(f"🔄 Logs rotados - manteniendo últimas {MAX_LOG_LINES} líneas")
 
             logger.info(f"🔄 Ciclo #{cycle_count}")
 
