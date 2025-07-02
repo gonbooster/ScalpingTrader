@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # === CONFIGURACIÓN ===
-VERSION = "v2.1-LOGS"
+VERSION = "v2.2-FIX"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")  # Se actualiza automáticamente en cada deploy
 
 SYMBOL = os.getenv("SYMBOL", "BTCUSDT")
