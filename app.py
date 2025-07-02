@@ -53,7 +53,18 @@ def trading_loop():
     cycle_count = 0
     
     logger.info("🚀 INICIANDO LOOP DE TRADING")
-    
+
+    # Primer análisis inmediato
+    logger.info("⚡ Ejecutando primer análisis...")
+    try:
+        if analyze_market():
+            last_analysis_time = datetime.now()
+            market_data = get_market_data()
+            analyze_trading_signals(market_data, last_signals)
+            logger.info("✅ Primer análisis completado")
+    except Exception as e:
+        logger.error(f"❌ Error en primer análisis: {e}")
+
     while bot_running:
         try:
             cycle_count += 1
@@ -237,15 +248,20 @@ def bot_status():
 # === MAIN ===
 if __name__ == "__main__":
     logger.info(f"🌐 Iniciando servidor Flask en puerto {PORT}")
-    
-    # Iniciar bot automáticamente
+
+    # Iniciar bot automáticamente ANTES de Flask
     logger.info("🔄 Preparando thread de trading...")
     if not bot_running:
         logger.info("🚀 Iniciando thread de trading...")
         bot_thread = threading.Thread(target=trading_loop, daemon=True)
         bot_thread.start()
         logger.info("✅ Thread de trading iniciado")
-    
+
+        # Dar tiempo al thread para inicializar
+        import time
+        time.sleep(2)
+        logger.info("⏰ Thread de trading inicializado")
+
     # Iniciar servidor Flask
     logger.info("🌐 Iniciando servidor Flask...")
     app.run(host="0.0.0.0", port=PORT, debug=False)

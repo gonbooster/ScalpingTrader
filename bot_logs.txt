@@ -347,3 +347,68 @@
 2025-07-02 14:16:15,002 - INFO - ✅ Ciclo 7 completado - 0 señales enviadas
 2025-07-02 14:16:48,908 - INFO - 127.0.0.1 - - [02/Jul/2025 14:16:48] "GET / HTTP/1.1" 200 -
 2025-07-02 14:16:49,084 - INFO - 127.0.0.1 - - [02/Jul/2025 14:16:49] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2025-07-02 15:17:32,521 - INFO - 🚀 SISTEMA DE LOGS INICIADO
+2025-07-02 15:17:32,521 - INFO - 📝 Archivo: bot_logs.txt (Max: 500 líneas)
+2025-07-02 15:17:32,650 - WARNING - ⚠️ Servicio de email no inicializado - faltan variables de entorno
+2025-07-02 15:17:32,651 - INFO - 🚀 Scalping Bot v5.0-MODULAR iniciado
+2025-07-02 15:17:32,651 - INFO - 📊 Símbolos: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
+2025-07-02 15:17:32,651 - INFO - 📧 Email: ❌
+2025-07-02 15:17:32,653 - INFO - 🌐 Iniciando servidor Flask en puerto 8000
+2025-07-02 15:17:32,653 - INFO - 🔄 Preparando thread de trading...
+2025-07-02 15:17:32,653 - INFO - 🚀 Iniciando thread de trading...
+2025-07-02 15:17:32,654 - INFO - 🚀 INICIANDO LOOP DE TRADING
+2025-07-02 15:17:32,654 - INFO - ✅ Thread de trading iniciado
+2025-07-02 15:17:32,654 - INFO - 🔄 Ciclo 1 - Analizando mercado...
+2025-07-02 15:17:32,654 - INFO - 🌐 Iniciando servidor Flask...
+2025-07-02 15:17:32,654 - INFO - 🔍 Analizando BTCUSDT...
+2025-07-02 15:17:32,654 - INFO - 📡 Obteniendo datos multi-timeframe...
+2025-07-02 15:17:32,654 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=100
+2025-07-02 15:17:32,665 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8000
+ * Running on http://10.10.50.100:8000
+2025-07-02 15:17:32,665 - INFO - [33mPress CTRL+C to quit[0m
+2025-07-02 15:17:33,108 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:33,108 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:33,208 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=50
+2025-07-02 15:17:33,432 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:33,432 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:33,533 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=30
+2025-07-02 15:17:33,768 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:33,768 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:33,769 - INFO - ✅ BTCUSDT: price=$109,454.85, rsi=47.9, score=75/100
+2025-07-02 15:17:33,769 - INFO - 🔍 Analizando ETHUSDT...
+2025-07-02 15:17:33,769 - INFO - 📡 Obteniendo datos multi-timeframe...
+2025-07-02 15:17:33,770 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1m&limit=100
+2025-07-02 15:17:33,990 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:33,990 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:34,091 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=15m&limit=50
+2025-07-02 15:17:34,316 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:34,316 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:34,417 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1h&limit=30
+2025-07-02 15:17:34,637 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:34,637 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:34,638 - INFO - ✅ ETHUSDT: price=$2,596.15, rsi=55.7, score=55/100
+2025-07-02 15:17:34,638 - INFO - 🔍 Analizando SOLUSDT...
+2025-07-02 15:17:34,638 - INFO - 📡 Obteniendo datos multi-timeframe...
+2025-07-02 15:17:34,638 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=1m&limit=100
+2025-07-02 15:17:34,874 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:34,875 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:34,975 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=15m&limit=50
+2025-07-02 15:17:35,617 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:35,618 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:35,718 - INFO - 📡 Conectando a Binance: https://api.binance.com/api/v3/klines?symbol=SOLUSDT&interval=1h&limit=30
+2025-07-02 15:17:36,365 - INFO - 📡 Respuesta Binance: Status 200
+2025-07-02 15:17:36,365 - INFO - ✅ Datos reales obtenidos de Binance
+2025-07-02 15:17:36,366 - INFO - ✅ SOLUSDT: price=$153.35, rsi=63.7, score=80/100
+2025-07-02 15:17:36,366 - INFO - 📊 Análisis completado: 3/3 símbolos
+2025-07-02 15:17:36,366 - INFO - 🔍 BUY BTCUSDT: 4/8 condiciones cumplidas
+2025-07-02 15:17:36,366 - INFO - 🔍 SELL BTCUSDT: 5/8 condiciones cumplidas
+2025-07-02 15:17:36,366 - INFO - 🔍 BUY ETHUSDT: 5/8 condiciones cumplidas
+2025-07-02 15:17:36,366 - INFO - 🔍 SELL ETHUSDT: 3/8 condiciones cumplidas
+2025-07-02 15:17:36,366 - INFO - 🔍 BUY SOLUSDT: 7/8 condiciones cumplidas
+2025-07-02 15:17:36,366 - WARNING - 📧 Servicio de email no inicializado
+2025-07-02 15:17:36,367 - ERROR - ❌ Error enviando señal buy para SOLUSDT
+2025-07-02 15:17:36,367 - INFO - 🔍 SELL SOLUSDT: 3/8 condiciones cumplidas
+2025-07-02 15:17:36,367 - INFO - ✅ Ciclo 1 completado - 0 señales enviadas
+2025-07-02 15:17:47,171 - INFO - 127.0.0.1 - - [02/Jul/2025 15:17:47] "GET / HTTP/1.1" 200 -
