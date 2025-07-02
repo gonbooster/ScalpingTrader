@@ -44,7 +44,7 @@ logger.info("📦 Importaciones completadas")
 logger.info("🔧 Iniciando configuración...")
 
 # === CONFIGURACIÓN ===
-VERSION = "v3.3-TRACE-LOGS"
+VERSION = "v3.4-FORCE-INIT"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -1083,10 +1083,12 @@ def monitoring_loop():
 # === Logs antes del main ===
 logger.info("🔧 Todas las rutas Flask definidas")
 logger.info("🔧 Llegando al punto de ejecución principal...")
+logger.info(f"🔧 __name__ = '{__name__}'")
 logger.info("🔧 Verificando si es __main__...")
 
-# === Inicio de la aplicación ===
-if __name__ == "__main__":
+# === Función de inicialización ===
+def initialize_bot():
+    """Función para inicializar el bot (funciona tanto en __main__ como en import)"""
     logger.info("🚀 INICIANDO SCALPING BOT...")
     logger.info("=" * 50)
     logger.info(f"🐍 Python version: {sys.version}")
@@ -1150,3 +1152,12 @@ if __name__ == "__main__":
         logger.error(f"❌ Error iniciando servidor: {e}")
         import traceback
         logger.error(f"❌ Traceback: {traceback.format_exc()}")
+
+# === Inicio de la aplicación ===
+if __name__ == "__main__":
+    logger.info("✅ Ejecutando desde __main__")
+    initialize_bot()
+else:
+    logger.info(f"⚠️ Ejecutando como import desde: {__name__}")
+    logger.info("🔧 Forzando inicialización para Render...")
+    initialize_bot()
