@@ -10,12 +10,27 @@ from datetime import datetime
 import threading
 import logging
 
-# Configurar logging detallado con archivo
+# Configurar logging con rotación automática
 import os
 log_file = "bot_logs.txt"
+MAX_LOG_LINES = 500  # Máximo 500 líneas
+
+def rotate_logs():
+    """Mantiene solo las últimas MAX_LOG_LINES líneas"""
+    try:
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            if len(lines) > MAX_LOG_LINES:
+                # Mantener solo las últimas MAX_LOG_LINES líneas
+                with open(log_file, 'w', encoding='utf-8') as f:
+                    f.writelines(lines[-MAX_LOG_LINES:])
+    except Exception as e:
+        print(f"Error rotando logs: {e}")
 
 # Crear handler para archivo
-file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
 file_handler.setLevel(logging.INFO)
 
 # Crear handler para consola
@@ -34,18 +49,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Rotar logs al inicio
+rotate_logs()
+
 # Log inicial
-logger.info("=" * 60)
-logger.info("🚀 SISTEMA DE LOGS INICIADO")
-logger.info(f"📝 Archivo de logs: {log_file}")
-logger.info("=" * 60)
+logger.info("🚀 SISTEMA DE LOGS INICIADO (Max: 500 líneas)")
+logger.info(f"📝 Archivo: {log_file}")
 
 # Logs inmediatos para debugging
 logger.info("📦 Importaciones completadas")
 logger.info("🔧 Iniciando configuración...")
 
 # === CONFIGURACIÓN ===
-VERSION = "v3.5-SYS-FIX"
+VERSION = "v4.1-OPTIMIZED"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -204,19 +220,23 @@ def get_klines(symbol, interval, limit=100):
         data = response.json()
 
         if isinstance(data, dict) and "code" in data:
-            logger.warning(f"⚠️ Error de Binance: {data}")
-            logger.warning("🔄 Cambiando a datos simulados...")
+            logger.error(f"❌ ERROR BINANCE: {data}")
+
+            if response.status_code == 451:
+                logger.error("🚫 BINANCE BLOQUEADO: Ubicación geográfica restringida")
+                logger.error("🌍 Solución: Usar servidor en Europa (Koyeb, Railway EU, etc)")
+
             using_simulation = True
-            return generate_simulation_data(limit)
+            raise Exception(f"Binance API Error: {data}")
 
         logger.info("✅ Datos reales obtenidos de Binance")
         using_simulation = False
         return data
     except Exception as e:
-        logger.error(f"❌ Error conectando con Binance: {e}")
-        logger.warning("🔄 Usando datos simulados para demostración...")
+        logger.error(f"❌ FALLO CRÍTICO conectando con Binance: {e}")
+        logger.error("🛑 BOT DETENIDO - No hay datos reales disponibles")
         using_simulation = True
-        return generate_simulation_data(limit)
+        raise Exception(f"No se pueden obtener datos reales: {e}")
 
 def get_multi_timeframe_data(symbol):
     """Obtiene datos de múltiples timeframes como en tu script Pine"""
@@ -235,41 +255,11 @@ def get_multi_timeframe_data(symbol):
         }
     except Exception as e:
         logger.error(f"❌ Error obteniendo datos multi-timeframe: {e}")
-        return None
+        logger.error("🛑 ANÁLISIS DETENIDO - Sin datos reales de Binance")
+        raise Exception(f"No se pueden obtener datos para {symbol}: {e}")
 
-def generate_simulation_data(limit=100):
-    """Genera datos simulados realistas para BTCUSDT"""
-    import random
-    
-    current_time = int(time.time() * 1000)
-    base_price = 97000
-    
-    data = []
-    price = base_price
-    
-    for i in range(limit):
-        change = random.uniform(-0.002, 0.002)
-        price *= (1 + change)
-        
-        open_price = price
-        high_price = price * (1 + random.uniform(0, 0.001))
-        low_price = price * (1 - random.uniform(0, 0.001))
-        close_price = price
-        volume = random.uniform(100, 1000)
-        
-        candle = [
-            current_time - (limit - i) * 60000,
-            f"{open_price:.2f}",
-            f"{high_price:.2f}",
-            f"{low_price:.2f}",
-            f"{close_price:.2f}",
-            f"{volume:.2f}",
-            current_time - (limit - i) * 60000 + 59999,
-            "0", 0, "0", "0", "0"
-        ]
-        data.append(candle)
-        
-    return data
+# Función de datos simulados ELIMINADA
+# El bot ahora solo funciona con datos reales de Binance
 
 # === Indicadores ===
 def ema(values, period):
@@ -313,9 +303,7 @@ def analyze_symbol(symbol):
         # Obtener datos multi-timeframe
         logger.info("📡 Obteniendo datos multi-timeframe...")
         mtf_data = get_multi_timeframe_data(symbol)
-        if not mtf_data:
-            logger.error(f"❌ No se pudieron obtener datos para {symbol}")
-            return False
+        # Si hay error, get_multi_timeframe_data ya lanza excepción
 
         # Procesar datos 1m (principal)
         data_1m = mtf_data["1m"]
@@ -526,7 +514,19 @@ def check_signals():
                     success_count += 1
                 time.sleep(1)  # Pequeña pausa entre símbolos
             except Exception as e:
-                logger.error(f"❌ Error procesando {symbol}: {e}")
+                logger.error(f"❌ ERROR CRÍTICO procesando {symbol}: {e}")
+
+                # Si es error de Binance, detener todo
+                if "Binance API Error" in str(e) or "No se pueden obtener datos" in str(e):
+                    logger.error("🛑 DETENIENDO BOT - Binance no disponible")
+                    logger.error("🌍 Solución: Usar servidor en Europa (Koyeb, Railway EU, etc)")
+                    global using_simulation
+                    using_simulation = True
+                    return False
+
+        if success_count == 0:
+            logger.error("🛑 NINGÚN ANÁLISIS EXITOSO - Bot detenido")
+            return False
 
         logger.info(f"✅ Análisis completado: {success_count}/{len(SYMBOLS)} símbolos exitosos")
         return success_count > 0
@@ -542,9 +542,17 @@ app = Flask(__name__)
 def home():
     global last_analysis_time, signal_count, using_simulation, bot_running, market_data
 
-    status = "🟢 ACTIVO" if bot_running and last_analysis_time else "🟡 INICIANDO"
+    if using_simulation:
+        status = "🔴 ERROR - Binance bloqueado"
+    elif bot_running and last_analysis_time:
+        status = "🟢 ACTIVO"
+    else:
+        status = "🟡 INICIANDO"
     last_time = last_analysis_time.strftime('%H:%M:%S') if last_analysis_time else "N/A"
-    data_source = "📊 Datos simulados (demo)" if using_simulation else "📡 Datos reales de Binance"
+    if using_simulation:
+        data_source = "🚫 ERROR: Binance bloqueado - Servidor en ubicación restringida"
+    else:
+        data_source = "📡 Datos reales de Binance"
     email_status = "✅ Configurado" if validate_config() else "⚠️ No configurado"
     current_hour = datetime.utcnow().hour
     trading_hour_status = "✅ Horario óptimo" if is_valid_trading_hour() else "⚠️ Fuera de horario"
@@ -766,87 +774,15 @@ def home():
 
     return html
 
-@app.route("/status")
-def status():
-    return jsonify({
-        "status": "active" if bot_running else "starting",
-        "symbols": SYMBOLS,
-        "market_data": market_data,
-        "signal_count": signal_count,
-        "last_analysis": last_analysis_time.isoformat() if last_analysis_time else None,
-        "using_simulation": using_simulation,
-        "email_configured": validate_config(),
-        "trading_hour": is_valid_trading_hour(),
-        "current_hour_utc": datetime.utcnow().hour
-    })
+# Endpoint /status eliminado - usar /health para monitoreo
 
 @app.route("/health")
 def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
-@app.route("/debug")
-def debug():
-    """Endpoint de debug avanzado para el sistema multi-par"""
-    global last_analysis_time, signal_count, using_simulation, bot_running, market_data
+# Endpoint /debug eliminado - información disponible en dashboard principal
 
-    # Calcular estadísticas
-    total_score = sum(data["score"] for data in market_data.values())
-    active_pairs = sum(1 for data in market_data.values() if data["price"] > 0)
-    avg_score = total_score // max(active_pairs, 1) if active_pairs > 0 else 0
-
-    return jsonify({
-        "bot_status": {
-            "running": bot_running,
-            "version": VERSION,
-            "last_analysis": last_analysis_time.isoformat() if last_analysis_time else None,
-            "analysis_age_seconds": (datetime.now() - last_analysis_time).total_seconds() if last_analysis_time else None,
-            "using_simulation": using_simulation
-        },
-        "symbols": SYMBOLS,
-        "market_data": market_data,
-        "statistics": {
-            "total_signals": signal_count,
-            "active_pairs": active_pairs,
-            "average_score": avg_score,
-            "trading_hour": is_valid_trading_hour(),
-            "current_hour_utc": datetime.utcnow().hour
-        },
-        "config": {
-            "email_configured": validate_config(),
-            "intervals": {
-                "main": INTERVAL,
-                "confirmation_15m": INTERVAL_15M,
-                "macro_1h": INTERVAL_1H
-            },
-            "analysis_interval_seconds": 60
-        },
-        "adaptive_params": {
-            symbol: get_adaptive_params(detect_pair_type(symbol))
-            for symbol in SYMBOLS
-        },
-        "timestamp": datetime.now().isoformat()
-    })
-
-@app.route("/test")
-def test():
-    """Endpoint para forzar un análisis de prueba"""
-    logger.info("🧪 TEST: Forzando análisis manual...")
-
-    try:
-        success = check_signals()
-        logger.info(f"🧪 TEST: Resultado del análisis: {success}")
-        return jsonify({
-            "test_result": "success" if success else "failed",
-            "message": "Análisis manual ejecutado",
-            "timestamp": datetime.now().isoformat()
-        })
-    except Exception as e:
-        logger.error(f"🧪 TEST: Error en análisis manual: {e}")
-        return jsonify({
-            "test_result": "error",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        })
+# Endpoint /test eliminado - análisis automático cada 60 segundos
 
 @app.route("/test-email")
 def test_email():
@@ -987,39 +923,7 @@ def view_logs_json():
             "timestamp": datetime.now().isoformat()
         })
 
-@app.route("/force-start")
-def force_start():
-    """Endpoint para forzar el inicio del bot en Render"""
-    global bot_running
-
-    logger.info("🔧 FORCE START: Forzando inicio del bot...")
-
-    try:
-        # Marcar como running
-        bot_running = True
-
-        # Ejecutar análisis inmediato
-        success = check_signals()
-
-        # Verificar estado
-        status = "active" if bot_running else "starting"
-
-        return jsonify({
-            "force_start": "success",
-            "bot_running": bot_running,
-            "analysis_result": success,
-            "status": status,
-            "message": "Bot forzado a iniciar",
-            "timestamp": datetime.now().isoformat()
-        })
-
-    except Exception as e:
-        logger.error(f"❌ Error en force start: {e}")
-        return jsonify({
-            "force_start": "error",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        })
+# Endpoint /force-start eliminado - inicio automático
 
 # === Loop de monitoreo ===
 def monitoring_loop():
@@ -1054,22 +958,21 @@ def monitoring_loop():
 
     while True:
         try:
-            logger.info(f"🔄 Iniciando ciclo de análisis #{cycle_count}")
-            logger.info(f"🕐 Timestamp: {datetime.now().isoformat()}")
-            logger.info(f"🔄 Estado bot_running: {bot_running}")
+            # Rotar logs cada 10 ciclos para evitar saturación
+            if cycle_count % 10 == 0:
+                rotate_logs()
+
+            logger.info(f"🔄 Ciclo #{cycle_count}")
 
             success = check_signals()
-            logger.info(f"📊 Resultado análisis: {success}")
 
             if success:
-                logger.info(f"✅ Ciclo #{cycle_count} completado exitosamente")
+                logger.info(f"✅ Ciclo #{cycle_count} completado")
             else:
                 logger.warning(f"⚠️ Ciclo #{cycle_count} falló")
 
-            logger.info(f"⏰ Esperando 60 segundos para próximo análisis...")
-            logger.info(f"💤 Iniciando sleep de 60 segundos...")
+            logger.info(f"💤 Sleep 60s...")
             time.sleep(60)
-            logger.info(f"⏰ Sleep completado, continuando...")
             cycle_count += 1
 
         except Exception as e:
