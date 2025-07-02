@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import time
 import numpy as np
@@ -44,7 +45,7 @@ logger.info("📦 Importaciones completadas")
 logger.info("🔧 Iniciando configuración...")
 
 # === CONFIGURACIÓN ===
-VERSION = "v3.4-FORCE-INIT"
+VERSION = "v3.5-SYS-FIX"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -1143,7 +1144,6 @@ def initialize_bot():
     logger.info("=" * 50)
 
     # Forzar flush de logs
-    import sys
     sys.stdout.flush()
 
     try:
