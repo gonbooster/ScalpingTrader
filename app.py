@@ -1457,8 +1457,39 @@ def initialize_bot():
     # Forzar flush de logs
     sys.stdout.flush()
 
+    # PRIORIDAD: Iniciar Flask INMEDIATAMENTE
+    logger.info("🚀 INICIANDO FLASK INMEDIATAMENTE...")
+
+    # Iniciar bot en background DESPUÉS de Flask
+    def start_bot_delayed():
+        import time
+        time.sleep(5)  # Esperar 5 segundos
+        logger.info("🤖 Iniciando bot en background...")
+        # Iniciar análisis automático
+        global bot_running
+        bot_running = True
+        while bot_running:
+            try:
+                # Análisis de todos los símbolos
+                for symbol in SYMBOLS:
+                    try:
+                        analyze_symbol(symbol)
+                        time.sleep(1)  # Pausa entre símbolos
+                    except Exception as e:
+                        logger.error(f"❌ Error analizando {symbol}: {e}")
+
+                time.sleep(60)  # Análisis cada 60 segundos
+            except Exception as e:
+                logger.error(f"❌ Error en análisis: {e}")
+                time.sleep(30)  # Retry en 30 segundos
+
+    # Bot en hilo separado
+    bot_thread = threading.Thread(target=start_bot_delayed, daemon=True)
+    bot_thread.start()
+
     try:
-        app.run(host="0.0.0.0", port=port, debug=False)
+        logger.info(f"🌐 Flask iniciando en puerto {port}...")
+        app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
     except Exception as e:
         logger.error(f"❌ Error iniciando servidor: {e}")
         import traceback
