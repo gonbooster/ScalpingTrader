@@ -9,18 +9,38 @@ from datetime import datetime
 import threading
 import logging
 
-# Configurar logging detallado
+# Configurar logging detallado con archivo
+import os
+log_file = "bot_logs.txt"
+
+# Crear handler para archivo
+file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+file_handler.setLevel(logging.INFO)
+
+# Crear handler para consola
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+
+# Formato de logs
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# Configurar logger
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
+    handlers=[file_handler, console_handler]
 )
 logger = logging.getLogger(__name__)
 
+# Log inicial
+logger.info("=" * 60)
+logger.info("🚀 SISTEMA DE LOGS INICIADO")
+logger.info(f"📝 Archivo de logs: {log_file}")
+logger.info("=" * 60)
+
 # === CONFIGURACIÓN ===
-VERSION = "v3.1-RENDER-FIX"
+VERSION = "v3.2-DEBUG-LOGS"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -867,6 +887,86 @@ def test_email():
             "timestamp": datetime.now().isoformat()
         })
 
+@app.route("/logs")
+def view_logs():
+    """Endpoint para ver los logs del bot"""
+    try:
+        if os.path.exists("bot_logs.txt"):
+            with open("bot_logs.txt", "r", encoding="utf-8") as f:
+                logs = f.read()
+
+            # Obtener últimas 100 líneas
+            log_lines = logs.split('\n')
+            recent_logs = log_lines[-100:] if len(log_lines) > 100 else log_lines
+
+            return f"""
+            <html>
+            <head>
+                <title>🤖 Bot Logs - Render Debug</title>
+                <meta http-equiv="refresh" content="10">
+                <style>
+                    body {{ font-family: monospace; background: #1a1a1a; color: #00ff00; padding: 20px; }}
+                    .log-container {{ background: #000; padding: 20px; border-radius: 10px; }}
+                    .log-line {{ margin: 2px 0; }}
+                    .error {{ color: #ff4444; }}
+                    .warning {{ color: #ffaa00; }}
+                    .info {{ color: #00ff00; }}
+                    .header {{ color: #00aaff; font-size: 18px; margin-bottom: 20px; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">🤖 SCALPING BOT LOGS - ÚLTIMAS 100 LÍNEAS</div>
+                <div class="header">🔄 Auto-refresh cada 10 segundos</div>
+                <div class="log-container">
+                    {'<br>'.join([f'<div class="log-line">{line}</div>' for line in recent_logs if line.strip()])}
+                </div>
+            </body>
+            </html>
+            """
+        else:
+            return jsonify({
+                "error": "Archivo de logs no encontrado",
+                "message": "El bot aún no ha generado logs",
+                "timestamp": datetime.now().isoformat()
+            })
+    except Exception as e:
+        logger.error(f"❌ Error leyendo logs: {e}")
+        return jsonify({
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
+@app.route("/logs-json")
+def view_logs_json():
+    """Endpoint para ver los logs en formato JSON"""
+    try:
+        if os.path.exists("bot_logs.txt"):
+            with open("bot_logs.txt", "r", encoding="utf-8") as f:
+                logs = f.read()
+
+            log_lines = logs.split('\n')
+            recent_logs = [line for line in log_lines[-50:] if line.strip()]
+
+            return jsonify({
+                "logs": recent_logs,
+                "total_lines": len(log_lines),
+                "showing_last": len(recent_logs),
+                "file_exists": True,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "logs": [],
+                "file_exists": False,
+                "error": "Archivo de logs no encontrado",
+                "timestamp": datetime.now().isoformat()
+            })
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
 @app.route("/force-start")
 def force_start():
     """Endpoint para forzar el inicio del bot en Render"""
@@ -906,33 +1006,57 @@ def monitoring_loop():
     global bot_running
 
     logger.info("🚀 HILO DE MONITOREO INICIADO")
+    logger.info(f"🧵 Thread ID: {threading.current_thread().ident}")
+    logger.info(f"🧵 Thread Name: {threading.current_thread().name}")
     logger.info("🚀 Iniciando bot de trading multi-par...")
     logger.info(f"📊 Monitoreando {', '.join(SYMBOLS)} cada 60 segundos")
 
-    email_configured = validate_config()
-    if email_configured:
-        logger.info("📧 Enviando alertas por email cuando detecte señales")
-    else:
-        logger.warning("📧 Email no configurado - solo monitoreo web")
+    try:
+        email_configured = validate_config()
+        logger.info(f"📧 Validación email: {email_configured}")
+        if email_configured:
+            logger.info("📧 Enviando alertas por email cuando detecte señales")
+        else:
+            logger.warning("📧 Email no configurado - solo monitoreo web")
 
-    bot_running = True
-    logger.info("✅ Bot marcado como running - iniciando loop de análisis")
+        bot_running = True
+        logger.info("✅ Bot marcado como running - iniciando loop de análisis")
+        logger.info(f"🔄 Variables globales: bot_running={bot_running}")
+
+    except Exception as e:
+        logger.error(f"❌ Error en inicialización del hilo: {e}")
+        logger.error(f"❌ Tipo de error: {type(e).__name__}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
 
     cycle_count = 1
+    logger.info("🔄 Entrando en loop principal infinito...")
+
     while True:
         try:
             logger.info(f"🔄 Iniciando ciclo de análisis #{cycle_count}")
+            logger.info(f"🕐 Timestamp: {datetime.now().isoformat()}")
+            logger.info(f"🔄 Estado bot_running: {bot_running}")
+
             success = check_signals()
+            logger.info(f"📊 Resultado análisis: {success}")
+
             if success:
-                logger.info(f"✅ Ciclo #{cycle_count} completado")
+                logger.info(f"✅ Ciclo #{cycle_count} completado exitosamente")
             else:
                 logger.warning(f"⚠️ Ciclo #{cycle_count} falló")
 
             logger.info(f"⏰ Esperando 60 segundos para próximo análisis...")
+            logger.info(f"💤 Iniciando sleep de 60 segundos...")
             time.sleep(60)
+            logger.info(f"⏰ Sleep completado, continuando...")
             cycle_count += 1
+
         except Exception as e:
             logger.error(f"❌ Error en loop principal (ciclo #{cycle_count}): {e}")
+            logger.error(f"❌ Tipo de error: {type(e).__name__}")
+            import traceback
+            logger.error(f"❌ Traceback completo: {traceback.format_exc()}")
             logger.info("⏰ Esperando 60 segundos antes de reintentar...")
             time.sleep(60)
             cycle_count += 1
@@ -941,14 +1065,27 @@ def monitoring_loop():
 if __name__ == "__main__":
     logger.info("🚀 INICIANDO SCALPING BOT...")
     logger.info("=" * 50)
+    logger.info(f"🐍 Python version: {sys.version}")
+    logger.info(f"🖥️ Platform: {sys.platform}")
+    logger.info(f"📁 Working directory: {os.getcwd()}")
+    logger.info(f"📝 Log file: {os.path.abspath('bot_logs.txt')}")
 
     # Mostrar configuración
     logger.info(f"📊 Símbolos: {', '.join(SYMBOLS)}")
     logger.info(f"⏰ Intervalos: {INTERVAL}, {INTERVAL_15M}, {INTERVAL_1H}")
-    logger.info(f"📧 Email configurado: {validate_config()}")
+
+    try:
+        email_config = validate_config()
+        logger.info(f"📧 Email configurado: {email_config}")
+        logger.info(f"📧 EMAIL_FROM: {'✅ Set' if EMAIL_FROM else '❌ Missing'}")
+        logger.info(f"📧 EMAIL_PASSWORD: {'✅ Set' if EMAIL_PASSWORD else '❌ Missing'}")
+        logger.info(f"📧 EMAIL_TO: {'✅ Set' if EMAIL_TO else '❌ Missing'}")
+    except Exception as e:
+        logger.error(f"❌ Error validando email: {e}")
 
     # Obtener puerto de Render
     port = int(os.environ.get("PORT", 5000))
+    logger.info(f"🌐 Puerto configurado: {port}")
 
     # Para Render: usar un enfoque más simple sin hilos complejos
     logger.info("🔄 Configurando monitoreo para Render...")
@@ -956,16 +1093,25 @@ if __name__ == "__main__":
     # Hacer un análisis inicial inmediatamente
     logger.info("🔄 Ejecutando análisis inicial...")
     try:
-        check_signals()
-        logger.info("✅ Análisis inicial completado")
+        result = check_signals()
+        logger.info(f"✅ Análisis inicial completado: {result}")
     except Exception as e:
         logger.error(f"❌ Error en análisis inicial: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
 
     # Iniciar hilo de monitoreo (más simple para Render)
     logger.info("🔄 Iniciando hilo de monitoreo...")
-    monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
-    monitoring_thread.start()
-    logger.info("✅ Hilo de monitoreo iniciado")
+    try:
+        monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
+        logger.info(f"🧵 Thread creado: {monitoring_thread}")
+        monitoring_thread.start()
+        logger.info("✅ Hilo de monitoreo iniciado")
+        logger.info(f"🧵 Thread alive: {monitoring_thread.is_alive()}")
+    except Exception as e:
+        logger.error(f"❌ Error iniciando hilo: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
 
     logger.info(f"🌐 Iniciando servidor web en puerto {port}...")
     logger.info("=" * 50)
@@ -974,4 +1120,9 @@ if __name__ == "__main__":
     import sys
     sys.stdout.flush()
 
-    app.run(host="0.0.0.0", port=port, debug=False)
+    try:
+        app.run(host="0.0.0.0", port=port, debug=False)
+    except Exception as e:
+        logger.error(f"❌ Error iniciando servidor: {e}")
+        import traceback
+        logger.error(f"❌ Traceback: {traceback.format_exc()}")
