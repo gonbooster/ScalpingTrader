@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # === CONFIGURACIÓN ===
-VERSION = "v3.0-MULTI"
+VERSION = "v3.1-RENDER-FIX"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Múltiples pares como en tu script Pine
@@ -867,19 +867,47 @@ def test_email():
             "timestamp": datetime.now().isoformat()
         })
 
+@app.route("/force-start")
+def force_start():
+    """Endpoint para forzar el inicio del bot en Render"""
+    global bot_running
+
+    logger.info("🔧 FORCE START: Forzando inicio del bot...")
+
+    try:
+        # Marcar como running
+        bot_running = True
+
+        # Ejecutar análisis inmediato
+        success = check_signals()
+
+        # Verificar estado
+        status = "active" if bot_running else "starting"
+
+        return jsonify({
+            "force_start": "success",
+            "bot_running": bot_running,
+            "analysis_result": success,
+            "status": status,
+            "message": "Bot forzado a iniciar",
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en force start: {e}")
+        return jsonify({
+            "force_start": "error",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        })
+
 # === Loop de monitoreo ===
 def monitoring_loop():
     global bot_running
 
-    # Forzar flush de logs inmediatamente
-    import sys
-
     logger.info("🚀 HILO DE MONITOREO INICIADO")
-    sys.stdout.flush()
-
     logger.info("🚀 Iniciando bot de trading multi-par...")
     logger.info(f"📊 Monitoreando {', '.join(SYMBOLS)} cada 60 segundos")
-    sys.stdout.flush()
 
     email_configured = validate_config()
     if email_configured:
@@ -887,22 +915,8 @@ def monitoring_loop():
     else:
         logger.warning("📧 Email no configurado - solo monitoreo web")
 
-    sys.stdout.flush()
-
     bot_running = True
     logger.info("✅ Bot marcado como running - iniciando loop de análisis")
-    sys.stdout.flush()
-
-    # Hacer primer análisis inmediatamente
-    logger.info("🔄 Ejecutando primer análisis...")
-    try:
-        success = check_signals()
-        if success:
-            logger.info("✅ Primer análisis completado exitosamente")
-        else:
-            logger.warning("⚠️ Primer análisis falló, continuando...")
-    except Exception as e:
-        logger.error(f"❌ Error en primer análisis: {e}")
 
     cycle_count = 1
     while True:
@@ -921,6 +935,7 @@ def monitoring_loop():
             logger.error(f"❌ Error en loop principal (ciclo #{cycle_count}): {e}")
             logger.info("⏰ Esperando 60 segundos antes de reintentar...")
             time.sleep(60)
+            cycle_count += 1
 
 # === Inicio de la aplicación ===
 if __name__ == "__main__":
@@ -935,21 +950,22 @@ if __name__ == "__main__":
     # Obtener puerto de Render
     port = int(os.environ.get("PORT", 5000))
 
-    # Iniciar loop de monitoreo en hilo separado ANTES del servidor
+    # Para Render: usar un enfoque más simple sin hilos complejos
+    logger.info("🔄 Configurando monitoreo para Render...")
+
+    # Hacer un análisis inicial inmediatamente
+    logger.info("🔄 Ejecutando análisis inicial...")
+    try:
+        check_signals()
+        logger.info("✅ Análisis inicial completado")
+    except Exception as e:
+        logger.error(f"❌ Error en análisis inicial: {e}")
+
+    # Iniciar hilo de monitoreo (más simple para Render)
     logger.info("🔄 Iniciando hilo de monitoreo...")
     monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
     monitoring_thread.start()
     logger.info("✅ Hilo de monitoreo iniciado")
-
-    # Dar tiempo para que el hilo se inicie
-    import time
-    time.sleep(2)
-    logger.info("⏰ Esperando 2 segundos para verificar hilo...")
-
-    if monitoring_thread.is_alive():
-        logger.info("✅ Hilo de monitoreo confirmado como activo")
-    else:
-        logger.error("❌ ERROR: Hilo de monitoreo no está activo")
 
     logger.info(f"🌐 Iniciando servidor web en puerto {port}...")
     logger.info("=" * 50)
