@@ -874,6 +874,15 @@ def check_signals():
         logger.error(f"❌ Error en análisis principal: {e}")
         return False
 
+def get_rsi_color(rsi):
+    """Determina el color del RSI basado en niveles"""
+    if rsi <= 30:
+        return "oversold"  # Verde - sobreventa
+    elif rsi >= 70:
+        return "overbought"  # Rojo - sobrecompra
+    else:
+        return "neutral"  # Amarillo - neutral
+
 # === Flask App ===
 app = Flask(__name__)
 
@@ -925,25 +934,44 @@ def home():
         <div class="crypto-card {pair_type.lower()}">
             <div class="crypto-header">
                 <div class="crypto-name">{params['emoji']} {params['name']}</div>
-                <div class="crypto-price">${data['price']:.2f}</div>
+                <div style="text-align: right;">
+                    <div class="crypto-price">${data['price']:.2f}</div>
+                    <div class="last-update">Actualizado: {datetime.now().strftime('%H:%M:%S')}</div>
+                </div>
             </div>
 
             <div class="metrics-grid">
                 <div class="metric">
-                    <div class="metric-value">{data['rsi']:.1f}</div>
+                    <div class="metric-value rsi-{get_rsi_color(data['rsi'])}">{data['rsi']:.1f}</div>
                     <div class="metric-label">RSI</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">{data['ema_fast']:.2f}</div>
+                    <div class="metric-value">${data['ema_fast']:.2f}</div>
                     <div class="metric-label">EMA {params['ema_fast']}</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">{data['ema_slow']:.2f}</div>
+                    <div class="metric-value">${data['ema_slow']:.2f}</div>
                     <div class="metric-label">EMA {params['ema_slow']}</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">{data['atr']:.2f}</div>
+                    <div class="metric-value">${data['atr']:.4f}</div>
                     <div class="metric-label">ATR</div>
+                </div>
+            </div>
+
+            <!-- Nuevo: Indicadores de tendencia -->
+            <div class="trend-indicators">
+                <div class="trend-item">
+                    <span class="trend-label">📈 Tendencia:</span>
+                    <span class="trend-value {'trend-bullish' if data['ema_fast'] > data['ema_slow'] else 'trend-bearish'}">
+                        {'🟢 Alcista' if data['ema_fast'] > data['ema_slow'] else '🔴 Bajista'}
+                    </span>
+                </div>
+                <div class="trend-item">
+                    <span class="trend-label">💪 Momentum:</span>
+                    <span class="trend-value {'momentum-strong' if abs(data['rsi'] - 50) > 20 else 'momentum-weak'}">
+                        {'🔥 Fuerte' if abs(data['rsi'] - 50) > 20 else '😴 Débil'}
+                    </span>
                 </div>
             </div>
 
@@ -1028,6 +1056,30 @@ def home():
             .metric {{ background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; }}
             .metric-value {{ font-size: 1.4em; font-weight: bold; color: #2c3e50; }}
             .metric-label {{ font-size: 0.9em; color: #6c757d; margin-top: 5px; }}
+            .rsi-oversold {{ color: #28a745 !important; }}
+            .rsi-overbought {{ color: #dc3545 !important; }}
+            .rsi-neutral {{ color: #ffc107 !important; }}
+            .trend-indicators {{
+                display: flex; justify-content: space-between;
+                margin: 15px 0; padding: 10px; background: #f8f9fa;
+                border-radius: 8px; font-size: 0.9em;
+            }}
+            .trend-item {{ display: flex; align-items: center; gap: 5px; }}
+            .trend-label {{ font-weight: 500; color: #6c757d; }}
+            .trend-bullish {{ color: #28a745; font-weight: bold; }}
+            .trend-bearish {{ color: #dc3545; font-weight: bold; }}
+            .momentum-strong {{ color: #fd7e14; font-weight: bold; }}
+            .momentum-weak {{ color: #6c757d; }}
+            .price-change {{
+                font-size: 0.9em; margin-left: 10px; padding: 2px 8px;
+                border-radius: 12px; font-weight: bold;
+            }}
+            .price-up {{ background: #d4edda; color: #155724; }}
+            .price-down {{ background: #f8d7da; color: #721c24; }}
+            .last-update {{
+                font-size: 0.8em; color: #6c757d;
+                text-align: center; margin-top: 10px;
+            }}
             .signal-status {{
                 padding: 15px; border-radius: 10px; text-align: center;
                 font-weight: bold; margin-top: 15px;
@@ -1098,13 +1150,30 @@ def home():
                             <div class="stat-value">{current_hour}:00 UTC</div>
                             <div class="stat-label">Hora Actual</div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-value">{'🟢' if not using_simulation else '🔴'}</div>
+                            <div class="stat-label">Conexión API</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">60s</div>
+                            <div class="stat-label">Frecuencia</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="footer">
-                <p>🔄 Auto-refresh cada 30 segundos • ⚡ Análisis cada 60 segundos</p>
-                <p>⚠️ Solo para fines educativos • Gestiona tu riesgo responsablemente</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+                    <div>
+                        <p>🔄 Auto-refresh cada 30 segundos • ⚡ Análisis cada 60 segundos</p>
+                        <p>⚠️ Solo para fines educativos • Gestiona tu riesgo responsablemente</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <p><strong>🎯 Estrategia Multi-Par</strong></p>
+                        <p>📊 RSI + EMA + ATR + Score</p>
+                        <p>🌍 Horario: 8:00-18:00 UTC</p>
+                    </div>
+                </div>
             </div>
         </div>
     </body>
