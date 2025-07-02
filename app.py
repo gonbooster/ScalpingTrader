@@ -888,294 +888,299 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    global last_analysis_time, signal_count, using_simulation, bot_running, market_data
+    """Dashboard limpio y responsive con auto-refresh dinámico"""
+    global last_analysis_time, signal_count, using_simulation, bot_running, market_data, last_signals
 
+    # Estado del sistema
     if using_simulation:
-        status = "🔴 ERROR - Binance bloqueado"
+        status = "🔴 ERROR"
+        data_source = "Binance bloqueado"
     elif bot_running and last_analysis_time:
         status = "🟢 ACTIVO"
+        data_source = "Datos reales"
     else:
         status = "🟡 INICIANDO"
+        data_source = "Conectando..."
+
     last_time = last_analysis_time.strftime('%H:%M:%S') if last_analysis_time else "N/A"
-    if using_simulation:
-        data_source = "🚫 ERROR: Binance bloqueado - Servidor en ubicación restringida"
-    else:
-        data_source = "📡 Datos reales de Binance"
-    email_status = "✅ Configurado" if validate_config() else "⚠️ No configurado"
-    current_hour = datetime.utcnow().hour
-    trading_hour_status = "✅ Horario óptimo" if is_valid_trading_hour() else "⚠️ Fuera de horario"
-    
-    # Generar tarjetas de criptomonedas
+    email_status = "✅ OK" if validate_config() else "⚠️ Error"
+    trading_hour_status = "✅ Óptimo" if is_valid_trading_hour() else "⚠️ Fuera"
+
+    # Calcular estadísticas
+    active_pairs = len([s for s in market_data.values() if s.get('price', 0) > 0])
+    total_score = sum([s.get('confidence_score', 0) for s in market_data.values()])
+    avg_score = f"{total_score // max(active_pairs, 1)}/100" if active_pairs > 0 else "0/100"
+    status_class = "active" if status == "🟢 ACTIVO" else "waiting"
+
+    # Generar cards de criptos (limpio)
     crypto_cards = ""
-    total_score = 0
-    active_pairs = 0
+    for symbol, data in market_data.items():
+        if not data.get('price', 0) > 0:
+            continue
 
-    for symbol in SYMBOLS:
-        data = market_data[symbol]
-        pair_type = detect_pair_type(symbol)
-        params = get_adaptive_params(pair_type)
+        # Datos básicos
+        name = symbol.replace('USDT', '')
+        price = f"${data.get('price', 0):,.2f}"
+        rsi = data.get('rsi_1m', 0)
+        rsi_15m = data.get('rsi_15m', 0)
+        score = data.get('confidence_score', 0)
 
-        if data["price"] > 0:
-            active_pairs += 1
-            total_score += data["score"]
+        # Señal actual
+        signal = last_signals.get(symbol, {})
+        signal_type = signal.get('action', 'WAIT')
+        signal_class = f"signal-{signal_type.lower()}"
+        signal_text = f"🎯 {signal_type}"
 
-        # Determinar estado de señal
-        if data["last_signal"] == "buy":
-            signal_class = "signal-buy"
-            signal_text = "🟢 COMPRA ACTIVA"
-        elif data["last_signal"] == "sell":
-            signal_class = "signal-sell"
-            signal_text = "🔴 VENTA ACTIVA"
-        else:
-            signal_class = "signal-wait"
-            signal_text = "⏸️ ESPERANDO"
+        # Barra de confianza
+        confidence_class = "confidence-low" if score < 40 else "confidence-medium" if score < 70 else "confidence-high"
 
         crypto_cards += f"""
-        <div class="crypto-card {pair_type.lower()}">
+        <div class="crypto-card" data-symbol="{symbol}">
             <div class="crypto-header">
-                <div class="crypto-name">{params['emoji']} {params['name']}</div>
-                <div style="text-align: right;">
-                    <div class="crypto-price">${data['price']:.2f}</div>
-                    <div class="last-update">Actualizado: {datetime.now().strftime('%H:%M:%S')}</div>
-                </div>
+                <div class="crypto-name">{name}</div>
+                <div class="crypto-price" data-price="{symbol}">{price}</div>
             </div>
-
             <div class="metrics-grid">
                 <div class="metric">
-                    <div class="metric-value rsi-{get_rsi_color(data['rsi'])}">{data['rsi']:.1f}</div>
-                    <div class="metric-label">RSI</div>
+                    <div class="metric-value" data-rsi="{symbol}">{rsi:.1f}</div>
+                    <div class="metric-label">RSI 1m</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">${data['ema_fast']:.2f}</div>
-                    <div class="metric-label">EMA {params['ema_fast']}</div>
+                    <div class="metric-value" data-rsi15="{symbol}">{rsi_15m:.1f}</div>
+                    <div class="metric-label">RSI 15m</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">${data['ema_slow']:.2f}</div>
-                    <div class="metric-label">EMA {params['ema_slow']}</div>
+                    <div class="metric-value" data-score="{symbol}">{score}/100</div>
+                    <div class="metric-label">Score</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-value">${data['atr']:.4f}</div>
-                    <div class="metric-label">ATR</div>
+                    <div class="metric-value">60s</div>
+                    <div class="metric-label">Análisis</div>
                 </div>
             </div>
-
-            <!-- Nuevo: Indicadores de tendencia -->
-            <div class="trend-indicators">
-                <div class="trend-item">
-                    <span class="trend-label">📈 Tendencia:</span>
-                    <span class="trend-value {'trend-bullish' if data['ema_fast'] > data['ema_slow'] else 'trend-bearish'}">
-                        {'🟢 Alcista' if data['ema_fast'] > data['ema_slow'] else '🔴 Bajista'}
-                    </span>
-                </div>
-                <div class="trend-item">
-                    <span class="trend-label">💪 Momentum:</span>
-                    <span class="trend-value {'momentum-strong' if abs(data['rsi'] - 50) > 20 else 'momentum-weak'}">
-                        {'🔥 Fuerte' if abs(data['rsi'] - 50) > 20 else '😴 Débil'}
-                    </span>
-                </div>
-            </div>
-
-            <div class="signal-status {signal_class}">
+            <div class="signal-status {signal_class}" data-signal="{symbol}">
                 {signal_text}
             </div>
-
-            <div style="margin-top: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span><strong>Score de Confianza:</strong></span>
-                    <span><strong>{data["score"]}/100</strong></span>
-                </div>
-                <div class="confidence-bar">
-                    <div class="confidence-fill" style="width: {data["score"]}%;"></div>
-                </div>
+            <div class="confidence-bar">
+                <div class="confidence-fill {confidence_class}" style="width: {score}%"></div>
             </div>
         </div>
         """
 
+    # Calcular estadísticas
+    active_pairs = len([s for s in market_data.values() if s.get('price', 0) > 0])
+    total_score = sum([s.get('confidence_score', 0) for s in market_data.values()])
     avg_score = f"{total_score // max(active_pairs, 1)}/100" if active_pairs > 0 else "0/100"
     status_class = "active" if status == "🟢 ACTIVO" else "waiting"
 
-    # Crear HTML directamente (más simple y confiable)
+    # Generar cards de criptos (limpio)
+    crypto_cards = ""
+    for symbol, data in market_data.items():
+        if not data.get('price', 0) > 0:
+            continue
+
+        # Datos básicos
+        name = symbol.replace('USDT', '')
+        price = f"${data.get('price', 0):,.2f}"
+        rsi = data.get('rsi_1m', 0)
+        rsi_15m = data.get('rsi_15m', 0)
+        score = data.get('confidence_score', 0)
+
+        # Señal actual
+        signal = last_signals.get(symbol, {})
+        signal_type = signal.get('action', 'WAIT')
+        signal_class = f"signal-{signal_type.lower()}"
+        signal_text = f"🎯 {signal_type}"
+
+        # Barra de confianza
+        confidence_class = "confidence-low" if score < 40 else "confidence-medium" if score < 70 else "confidence-high"
+
+        crypto_cards += f"""
+        <div class="crypto-card" data-symbol="{symbol}">
+            <div class="crypto-header">
+                <div class="crypto-name">{name}</div>
+                <div class="crypto-price" data-price="{symbol}">{price}</div>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric">
+                    <div class="metric-value" data-rsi="{symbol}">{rsi:.1f}</div>
+                    <div class="metric-label">RSI 1m</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" data-rsi15="{symbol}">{rsi_15m:.1f}</div>
+                    <div class="metric-label">RSI 15m</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" data-score="{symbol}">{score}/100</div>
+                    <div class="metric-label">Score</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">60s</div>
+                    <div class="metric-label">Análisis</div>
+                </div>
+            </div>
+            <div class="signal-status {signal_class}" data-signal="{symbol}">
+                {signal_text}
+            </div>
+            <div class="confidence-bar">
+                <div class="confidence-fill {confidence_class}" style="width: {score}%"></div>
+            </div>
+        </div>
+        """
+
+
+    # HTML limpio y responsive con auto-refresh dinámico
     html = f"""
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>🤖 Scalping PRO - Multi-Par Dashboard</title>
-        <meta http-equiv="refresh" content="30">
+        <title>Scalping Dashboard</title>
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh; padding: 20px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #f5f5f5; color: #333; line-height: 1.6;
             }}
-            .container {{
-                max-width: 1400px; margin: 0 auto;
-                background: rgba(255, 255, 255, 0.95);
-                border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            }}
+            .container {{ max-width: 1200px; margin: 0 auto; padding: 20px; }}
             .header {{
-                background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-                color: white; padding: 30px; text-align: center;
+                background: #fff; padding: 20px; margin-bottom: 20px;
+                border-radius: 8px; border: 1px solid #e0e0e0;
             }}
-            .header h1 {{ font-size: 2.5em; margin-bottom: 10px; }}
-            .version {{ font-size: 0.9em; opacity: 0.8; margin-top: 15px; }}
+            .header h1 {{ font-size: 1.8rem; color: #333; margin-bottom: 5px; }}
+            .header p {{ color: #666; font-size: 0.9rem; }}
             .status-bar {{
-                background: #f8f9fa; padding: 20px; display: flex;
-                justify-content: space-between; flex-wrap: wrap;
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 10px; margin-bottom: 20px;
             }}
             .status-item {{
-                margin: 5px; padding: 10px 15px; background: white;
-                border-radius: 25px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                background: #fff; padding: 12px; border-radius: 6px;
+                border: 1px solid #e0e0e0; font-size: 0.85rem;
             }}
-            .status-active {{ color: #28a745; }}
-            .status-waiting {{ color: #ffc107; }}
-            .main-content {{ padding: 30px; }}
+            .status-active {{ border-left: 3px solid #22c55e; }}
+            .status-waiting {{ border-left: 3px solid #f59e0b; }}
             .crypto-grid {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-                gap: 25px; margin-bottom: 30px;
+                display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+                gap: 20px; margin-bottom: 20px;
             }}
             .crypto-card {{
-                background: white; border-radius: 15px; padding: 25px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-left: 5px solid;
+                background: #fff; padding: 20px; border-radius: 8px;
+                border: 1px solid #e0e0e0;
             }}
-            .crypto-card.btc {{ border-left-color: #f7931a; }}
-            .crypto-card.eth {{ border-left-color: #627eea; }}
-            .crypto-card.sol {{ border-left-color: #9945ff; }}
-            .crypto-header {{
-                display: flex; justify-content: space-between;
-                align-items: center; margin-bottom: 20px;
+            .crypto-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }}
+            .crypto-name {{ font-weight: 600; color: #333; }}
+            .crypto-price {{ font-weight: 700; color: #333; font-size: 1.2rem; }}
+            .metrics-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }}
+            .metric {{ background: #f8f9fa; padding: 10px; border-radius: 4px; text-align: center; }}
+            .metric-value {{ font-weight: 600; color: #333; }}
+            .metric-label {{ font-size: 0.8rem; color: #666; margin-top: 2px; }}
+            .signal-status {{ padding: 10px; border-radius: 4px; text-align: center; font-weight: 500; }}
+            .signal-buy {{ background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }}
+            .signal-sell {{ background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }}
+            .signal-wait {{ background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }}
+            .confidence-bar {{ width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; margin-top: 8px; }}
+            .confidence-fill {{ height: 100%; border-radius: 3px; transition: width 0.3s ease; }}
+            .confidence-low {{ background: #ef4444; }}
+            .confidence-medium {{ background: #f59e0b; }}
+            .confidence-high {{ background: #22c55e; }}
+            .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; }}
+            .stat-card {{ background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; }}
+            .stat-value {{ font-weight: 700; color: #333; font-size: 1.4rem; }}
+            .stat-label {{ color: #666; font-size: 0.8rem; margin-top: 4px; }}
+            .footer {{ background: #fff; padding: 15px; margin-top: 20px; border-radius: 6px; border: 1px solid #e0e0e0; text-align: center; font-size: 0.8rem; color: #666; }}
+            .update-indicator {{ position: fixed; top: 20px; right: 20px; background: #22c55e; color: white; padding: 8px 12px; border-radius: 4px; font-size: 0.8rem; opacity: 0; transition: opacity 0.3s; }}
+            .update-indicator.show {{ opacity: 1; }}
+            @media (max-width: 768px) {{
+                .container {{ padding: 10px; }}
+                .crypto-grid {{ grid-template-columns: 1fr; }}
+                .status-bar {{ grid-template-columns: 1fr; }}
+                .header h1 {{ font-size: 1.5rem; }}
+                .crypto-price {{ font-size: 1.1rem; }}
             }}
-            .crypto-name {{ font-size: 1.5em; font-weight: bold; }}
-            .crypto-price {{ font-size: 1.8em; font-weight: bold; color: #2c3e50; }}
-            .metrics-grid {{
-                display: grid; grid-template-columns: repeat(2, 1fr);
-                gap: 15px; margin-bottom: 20px;
-            }}
-            .metric {{ background: #f8f9fa; padding: 15px; border-radius: 10px; text-align: center; }}
-            .metric-value {{ font-size: 1.4em; font-weight: bold; color: #2c3e50; }}
-            .metric-label {{ font-size: 0.9em; color: #6c757d; margin-top: 5px; }}
-            .rsi-oversold {{ color: #28a745 !important; }}
-            .rsi-overbought {{ color: #dc3545 !important; }}
-            .rsi-neutral {{ color: #ffc107 !important; }}
-            .trend-indicators {{
-                display: flex; justify-content: space-between;
-                margin: 15px 0; padding: 10px; background: #f8f9fa;
-                border-radius: 8px; font-size: 0.9em;
-            }}
-            .trend-item {{ display: flex; align-items: center; gap: 5px; }}
-            .trend-label {{ font-weight: 500; color: #6c757d; }}
-            .trend-bullish {{ color: #28a745; font-weight: bold; }}
-            .trend-bearish {{ color: #dc3545; font-weight: bold; }}
-            .momentum-strong {{ color: #fd7e14; font-weight: bold; }}
-            .momentum-weak {{ color: #6c757d; }}
-            .price-change {{
-                font-size: 0.9em; margin-left: 10px; padding: 2px 8px;
-                border-radius: 12px; font-weight: bold;
-            }}
-            .price-up {{ background: #d4edda; color: #155724; }}
-            .price-down {{ background: #f8d7da; color: #721c24; }}
-            .last-update {{
-                font-size: 0.8em; color: #6c757d;
-                text-align: center; margin-top: 10px;
-            }}
-            .signal-status {{
-                padding: 15px; border-radius: 10px; text-align: center;
-                font-weight: bold; margin-top: 15px;
-            }}
-            .signal-buy {{ background: linear-gradient(135deg, #28a745, #20c997); color: white; }}
-            .signal-sell {{ background: linear-gradient(135deg, #dc3545, #fd7e14); color: white; }}
-            .signal-wait {{ background: linear-gradient(135deg, #6c757d, #adb5bd); color: white; }}
-            .confidence-bar {{
-                width: 100%; height: 20px; background: #e9ecef;
-                border-radius: 10px; overflow: hidden; margin-top: 10px;
-            }}
-            .confidence-fill {{
-                height: 100%; background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%);
-                transition: width 0.3s ease;
-            }}
-            .stats-section {{
-                background: white; border-radius: 15px; padding: 25px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.1); margin-top: 30px;
-            }}
-            .stats-grid {{
-                display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 20px;
-            }}
-            .stat-card {{ background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: center; }}
-            .stat-value {{ font-size: 2em; font-weight: bold; color: #2c3e50; }}
-            .stat-label {{ color: #6c757d; margin-top: 5px; }}
-            .footer {{ background: #2c3e50; color: white; padding: 20px; text-align: center; }}
+
         </style>
     </head>
     <body>
+        <div class="update-indicator" id="updateIndicator">Actualizado</div>
         <div class="container">
             <div class="header">
-                <h1>🤖 Scalping PRO Dashboard</h1>
-                <p>Análisis Multi-Par Avanzado • BTC/ETH/SOL</p>
-                <div class="version">{VERSION} • Deploy: {DEPLOY_TIME}</div>
+                <h1>Scalping Dashboard</h1>
+                <p>BTC • ETH • SOL • Análisis en tiempo real</p>
             </div>
 
             <div class="status-bar">
-                <div class="status-item status-{status_class}">🤖 Estado: {status}</div>
-                <div class="status-item">📧 Email: {email_status}</div>
-                <div class="status-item">⏰ Horario: {trading_hour_status}</div>
-                <div class="status-item">📡 Fuente: {data_source}</div>
-                <div class="status-item">🔔 Señales: {signal_count}</div>
-                <div class="status-item">⏱️ Último: {last_time}</div>
+                <div class="status-item status-{status_class}">Estado: {status}</div>
+                <div class="status-item">Email: {email_status}</div>
+                <div class="status-item">Horario: {trading_hour_status}</div>
+                <div class="status-item">Señales: {signal_count}</div>
+                <div class="status-item">Último: {last_time}</div>
             </div>
 
-            <div class="main-content">
-                <div class="crypto-grid">
-                    {crypto_cards}
-                </div>
+            <div class="crypto-grid">
+                {crypto_cards}
+            </div>
 
-                <div class="stats-section">
-                    <h2 style="margin-bottom: 20px; color: #2c3e50;">📊 Estadísticas Generales</h2>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-value">{signal_count}</div>
-                            <div class="stat-label">Señales Enviadas</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">{active_pairs}</div>
-                            <div class="stat-label">Pares Activos</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">{avg_score}</div>
-                            <div class="stat-label">Score Promedio</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">{current_hour}:00 UTC</div>
-                            <div class="stat-label">Hora Actual</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">{'🟢' if not using_simulation else '🔴'}</div>
-                            <div class="stat-label">Conexión API</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-value">60s</div>
-                            <div class="stat-label">Frecuencia</div>
-                        </div>
-                    </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{signal_count}</div>
+                    <div class="stat-label">Señales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{active_pairs}</div>
+                    <div class="stat-label">Pares</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{avg_score}</div>
+                    <div class="stat-label">Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">60s</div>
+                    <div class="stat-label">Frecuencia</div>
                 </div>
             </div>
 
             <div class="footer">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-                    <div>
-                        <p>🔄 Auto-refresh cada 30 segundos • ⚡ Análisis cada 60 segundos</p>
-                        <p>⚠️ Solo para fines educativos • Gestiona tu riesgo responsablemente</p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p><strong>🎯 Estrategia Multi-Par</strong></p>
-                        <p>📊 RSI + EMA + ATR + Score</p>
-                        <p>🌍 Horario: 8:00-18:00 UTC</p>
-                    </div>
-                </div>
+                <p>Auto-actualización cada 30 segundos • Solo fines educativos</p>
             </div>
         </div>
+
+        <script>
+            // Auto-refresh dinámico
+            async function updateData() {{
+                try {{
+                    const response = await fetch('/api/data');
+                    const data = await response.json();
+
+                    // Actualizar precios y métricas
+                    Object.entries(data.market_data).forEach(([symbol, info]) => {{
+                        const priceEl = document.querySelector(`[data-price="${{symbol}}"]`);
+                        const rsiEl = document.querySelector(`[data-rsi="${{symbol}}"]`);
+                        const rsi15El = document.querySelector(`[data-rsi15="${{symbol}}"]`);
+                        const scoreEl = document.querySelector(`[data-score="${{symbol}}"]`);
+
+                        if (priceEl) priceEl.textContent = `$${{info.price?.toFixed(2) || '0.00'}}`;
+                        if (rsiEl) rsiEl.textContent = (info.rsi_1m || 0).toFixed(1);
+                        if (rsi15El) rsi15El.textContent = (info.rsi_15m || 0).toFixed(1);
+                        if (scoreEl) scoreEl.textContent = `${{info.confidence_score || 0}}/100`;
+                    }});
+
+                    // Mostrar indicador de actualización
+                    const indicator = document.getElementById('updateIndicator');
+                    indicator.classList.add('show');
+                    setTimeout(() => indicator.classList.remove('show'), 2000);
+
+                }} catch (error) {{
+                    console.error('Error actualizando datos:', error);
+                }}
+            }}
+
+            // Actualizar cada 30 segundos
+            setInterval(updateData, 30000);
+
+            // Primera actualización después de 5 segundos
+            setTimeout(updateData, 5000);
+        </script>
     </body>
     </html>
     """
@@ -1187,6 +1192,19 @@ def home():
 @app.route("/health")
 def health():
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
+
+@app.route("/api/data")
+def get_live_data():
+    """Endpoint para datos JSON - auto-refresh dinámico"""
+    global market_data, last_signals, last_analysis_time, signal_count
+
+    return jsonify({
+        'market_data': market_data,
+        'last_signals': last_signals,
+        'last_analysis_time': last_analysis_time.isoformat() if last_analysis_time else None,
+        'signal_count': signal_count,
+        'timestamp': datetime.now().isoformat()
+    })
 
 # Endpoint /debug eliminado - información disponible en dashboard principal
 
