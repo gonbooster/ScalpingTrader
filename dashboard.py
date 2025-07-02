@@ -20,10 +20,16 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
     if last_analysis_time:
         now = datetime.now()
         time_diff = (now - last_analysis_time).total_seconds()
-        if time_diff < 60:
+
+        # Manejar tiempo negativo (diferencias de zona horaria)
+        if time_diff < 0:
+            last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (ahora)"
+        elif time_diff < 60:
             last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {int(time_diff)}s)"
-        else:
+        elif time_diff < 3600:  # Menos de 1 hora
             last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {int(time_diff/60)}m)"
+        else:  # Más de 1 hora
+            last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {int(time_diff/3600)}h)"
     else:
         last_time = "N/A"
     
@@ -347,7 +353,18 @@ def get_dashboard_js():
                 const now = new Date();
                 const diffSeconds = Math.floor((now - lastTime) / 1000);
                 const timeStr = lastTime.toLocaleTimeString();
-                const agoStr = diffSeconds < 60 ? `hace ${diffSeconds}s` : `hace ${Math.floor(diffSeconds/60)}m`;
+
+                let agoStr;
+                if (diffSeconds < 0) {
+                    agoStr = 'ahora';
+                } else if (diffSeconds < 60) {
+                    agoStr = `hace ${diffSeconds}s`;
+                } else if (diffSeconds < 3600) {
+                    agoStr = `hace ${Math.floor(diffSeconds/60)}m`;
+                } else {
+                    agoStr = `hace ${Math.floor(diffSeconds/3600)}h`;
+                }
+
                 updateElement('.status-item:nth-child(5)', `<strong>Último:</strong> ${timeStr} (${agoStr})`);
             }
         }
