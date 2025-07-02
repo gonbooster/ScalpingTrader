@@ -20,6 +20,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # === CONFIGURACIÓN ===
+VERSION = "v2.1-LOGS"
+DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")  # Se actualiza automáticamente en cada deploy
+
 SYMBOL = os.getenv("SYMBOL", "BTCUSDT")
 INTERVAL = os.getenv("INTERVAL", "1m")
 
@@ -278,6 +281,9 @@ def home():
             <div class="header">
                 <h1>🤖 Scalping Alert Bot</h1>
                 <p>Trading automático con EMA y RSI</p>
+                <div style="font-size: 11px; color: #888; margin-top: 8px; border-top: 1px solid #333; padding-top: 8px;">
+                    {VERSION} • Deploy: {DEPLOY_TIME}
+                </div>
             </div>
             
             <div class="status {'active' if status == '🟢 ACTIVO' else 'waiting'}">
