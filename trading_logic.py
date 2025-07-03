@@ -11,7 +11,10 @@ class TradingLogic:
     def __init__(self):
         self.last_signals = {}
         self.signal_count = 0
-        self.cooldown_time = 300  # 5 minutos entre señales del mismo par
+        self.cooldown_time = 1800  # 30 minutos entre señales del mismo par
+        self.daily_email_count = 0
+        self.last_email_date = None
+        self.max_daily_emails = 10  # Máximo 10 emails por día
     
     def validate_breakout_candle(self, data, signal_type):
         """Valida que la vela de ruptura tenga características fuertes"""
@@ -88,7 +91,7 @@ class TradingLogic:
             "RSI_15m_bullish": data["rsi_15m"] > 50,
             "EMA_crossover": data["ema_fast"] > data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_strong": data["score"] >= 75,  # Solo señales FUERTES por email
+            "Confidence_excellent": data["score"] >= 90,  # Solo señales EXCELENTES por email
             "Price_above_EMA": data["price"] > data["ema_fast"],
             "Candle_positive": data["candle_change_percent"] > 0.1
         }
@@ -106,7 +109,7 @@ class TradingLogic:
         
         # Contar condiciones cumplidas
         fulfilled = sum(1 for v in conditions.values() if v)
-        required = 6  # Mínimo 6 de 8 condiciones
+        required = 7  # Mínimo 7 de 8 condiciones para emails
         
         logger.info(f"🔍 BUY {symbol}: {fulfilled}/{len(conditions)} condiciones cumplidas")
         
@@ -122,7 +125,7 @@ class TradingLogic:
             "RSI_15m_bearish": data["rsi_15m"] < 50,
             "EMA_crossunder": data["ema_fast"] < data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_strong": data["score"] >= 75,  # Solo señales FUERTES por email
+            "Confidence_excellent": data["score"] >= 90,  # Solo señales EXCELENTES por email
             "Price_below_EMA": data["price"] < data["ema_fast"],
             "Candle_negative": data["candle_change_percent"] < -0.1
         }
@@ -140,16 +143,33 @@ class TradingLogic:
         
         # Contar condiciones cumplidas
         fulfilled = sum(1 for v in conditions.values() if v)
-        required = 6  # Mínimo 6 de 8 condiciones
+        required = 7  # Mínimo 7 de 8 condiciones para emails
         
         logger.info(f"🔍 SELL {symbol}: {fulfilled}/{len(conditions)} condiciones cumplidas")
         
         return fulfilled >= required, conditions
     
+    def check_daily_email_limit(self):
+        """Verifica si se ha alcanzado el límite diario de emails"""
+        from datetime import date
+        today = date.today()
+
+        # Resetear contador si es un nuevo día
+        if self.last_email_date != today:
+            self.daily_email_count = 0
+            self.last_email_date = today
+
+        return self.daily_email_count < self.max_daily_emails
+
     def process_signal(self, symbol, signal_type, market_data, conditions):
         """Procesa y envía una señal de trading"""
         try:
             data = market_data[symbol]
+
+            # Verificar límite diario de emails
+            if not self.check_daily_email_limit():
+                logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails})")
+                return False
             
             # Calcular price targets
             price_targets = calculate_price_targets(
@@ -166,6 +186,7 @@ class TradingLogic:
             
             if email_sent:
                 self.signal_count += 1
+                self.daily_email_count += 1  # Incrementar contador diario
                 self.update_signal_tracking(symbol, signal_type, data["price"])
                 
                 # Actualizar market_data
