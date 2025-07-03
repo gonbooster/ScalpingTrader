@@ -16,6 +16,78 @@ def get_24h_price_change(symbol, current_price):
         print(f"Error obteniendo datos 24h para {symbol}: {e}")
     return None, 0
 
+def generate_criteria_indicators(criteria_data, signal_type):
+    """Genera los indicadores visuales de criterios"""
+    if not criteria_data or 'criteria' not in criteria_data:
+        return "".join(['<span class="criteria-dot inactive">⚪</span>' for _ in range(8)])
+
+    criteria = criteria_data['criteria']
+    indicators = ""
+
+    # Nombres amigables para los criterios
+    criteria_names = {
+        'buy': {
+            "RSI_1m_favorable": "RSI 1m OK",
+            "RSI_15m_bullish": "RSI 15m ↗",
+            "EMA_crossover": "EMA Cross",
+            "Volume_high": "Vol Alto",
+            "Confidence_excellent": "Score 90+",
+            "Price_above_EMA": "Precio > EMA",
+            "Candle_positive": "Vela +",
+            "Signal_distance": "Distancia"
+        },
+        'sell': {
+            "RSI_1m_overbought": "RSI 1m 70+",
+            "RSI_15m_bearish": "RSI 15m ↘",
+            "EMA_crossunder": "EMA Cross",
+            "Volume_high": "Vol Alto",
+            "Confidence_excellent": "Score 90+",
+            "Price_below_EMA": "Precio < EMA",
+            "Candle_negative": "Vela -",
+            "Signal_distance": "Distancia"
+        }
+    }
+
+    names = criteria_names.get(signal_type, {})
+
+    for key, value in criteria.items():
+        name = names.get(key, key)
+        if value:
+            indicators += f'<span class="criteria-dot active" title="{name}">✅</span>'
+        else:
+            indicators += f'<span class="criteria-dot inactive" title="{name}">⚪</span>'
+
+    return indicators
+
+def generate_status_cards(symbol, bot_running, email_status, signal_count, last_time):
+    """Genera las cards de status para cada crypto"""
+    status = "🟢 ACTIVO" if bot_running else "🟡 INICIANDO"
+
+    return f"""
+    <div class="status-cards">
+        <div class="status-card">
+            <div class="status-label">Estado</div>
+            <div class="status-value">{status}</div>
+        </div>
+        <div class="status-card">
+            <div class="status-label">Email</div>
+            <div class="status-value">{email_status}</div>
+        </div>
+        <div class="status-card">
+            <div class="status-label">Horario</div>
+            <div class="status-value">✅ Óptimo</div>
+        </div>
+        <div class="status-card">
+            <div class="status-label">Señales</div>
+            <div class="status-value">{signal_count}</div>
+        </div>
+        <div class="status-card">
+            <div class="status-label">Último</div>
+            <div class="status-value">{last_time}</div>
+        </div>
+    </div>
+    """
+
 def generate_dashboard_html(market_data, last_signals, signal_count, bot_running,
                           last_analysis_time, using_simulation, email_status):
     """Genera el HTML completo del dashboard"""
@@ -49,7 +121,7 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         last_time = "N/A"
     
     # Generar cards de criptomonedas
-    crypto_cards = generate_crypto_cards(market_data, last_signals)
+    crypto_cards = generate_crypto_cards(market_data, last_signals, signal_count, bot_running, last_analysis_time, using_simulation, email_status)
     
     # HTML completo
     html = f"""
@@ -69,9 +141,17 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 <p>BTC • ETH • SOL • Análisis en tiempo real</p>
                 <div class="header-buttons">
                     <a href="/analytics" class="analytics-btn-compact" target="_blank">📊 Analytics</a>
+                    <a href="/logs" class="logs-btn-compact" target="_blank">📋 Logs</a>
                 </div>
             </div>
 
+
+
+            <div class="crypto-grid">
+                {crypto_cards}
+            </div>
+
+            <!-- Status Cards en Footer -->
             <div class="status-bar">
                 <div class="status-item status-active">
                     <strong>Estado:</strong> {status}
@@ -90,10 +170,6 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 </div>
             </div>
 
-            <div class="crypto-grid">
-                {crypto_cards}
-            </div>
-
             <div class="footer">
                 <p>🤖 Scalping Bot PRO • ⚠️ Solo para fines educativos</p>
             </div>
@@ -108,15 +184,39 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
     
     return html
 
-def generate_crypto_cards(market_data, last_signals):
+def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, last_analysis_time, using_simulation, email_status):
     """Genera las cards de criptomonedas"""
     crypto_cards = ""
-    
+
+    # Estado del sistema
+    if using_simulation:
+        status = "🔴 ERROR"
+    elif bot_running and last_analysis_time:
+        status = "🟢 ACTIVO"
+    else:
+        status = "🟡 INICIANDO"
+
+    # Formato de tiempo más claro
+    if last_analysis_time:
+        from datetime import datetime
+        now = datetime.now()
+        diff = now - last_analysis_time
+        seconds = int(diff.total_seconds())
+
+        if seconds < 60:
+            last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {seconds}s)"
+        else:
+            minutes = seconds // 60
+            last_time = f"{last_analysis_time.strftime('%H:%M:%S')} (hace {minutes}m)"
+    else:
+        last_time = "Nunca"
+
     for symbol, data in market_data.items():
         # Datos básicos
         name = symbol.replace('USDT', '')
         price_raw = data.get('price', 0)  # Precio sin formatear
-        rsi = data.get('rsi', 0)
+        rsi_1m = data.get('rsi_1m', 0)
+        rsi_5m = data.get('rsi_5m', 0)
         rsi_15m = data.get('rsi_15m', 0)
         score = data.get('score', 0)
         
@@ -124,17 +224,36 @@ def generate_crypto_cards(market_data, last_signals):
         candle_change = data.get('candle_change_percent', 0)
         vol_now = data.get('volume', 0)
         vol_avg = data.get('vol_avg', 1)
+
+        # Cambio de precio actual (momentum de la vela actual)
+        change_emoji = "📈" if candle_change > 0 else "📉" if candle_change < 0 else "➡️"
+        change_color = "#22c55e" if candle_change > 0 else "#ef4444" if candle_change < 0 else "#94a3b8"
+
+        # Interpretación del momentum
+        if abs(candle_change) >= 0.5:
+            momentum_strength = "🔥 FUERTE"
+        elif abs(candle_change) >= 0.2:
+            momentum_strength = "⚡ MEDIO"
+        else:
+            momentum_strength = "📊 DÉBIL"
+
+        # Calcular ratio de volumen de forma segura
+        vol_ratio = vol_now / vol_avg if vol_avg > 0 else 0
         
         # Targets para BUY y SELL
         tp_buy = data.get('take_profit_buy', 0)
         sl_buy = data.get('stop_loss_buy', 0)
         move_buy = data.get('expected_move_buy', 0)
         rr_buy = data.get('risk_reward_buy', 0)
-        
+
         tp_sell = data.get('take_profit_sell', 0)
         sl_sell = data.get('stop_loss_sell', 0)
         move_sell = data.get('expected_move_sell', 0)
         rr_sell = data.get('risk_reward_sell', 0)
+
+        # Criterios de trading
+        buy_criteria = data.get('buy_criteria', {})
+        sell_criteria = data.get('sell_criteria', {})
         
         # Señal actual (eliminada - redundante con sistema de confianza)
         
@@ -162,7 +281,7 @@ def generate_crypto_cards(market_data, last_signals):
 
         # Clases adicionales
         candle_class = "positive" if candle_change > 0 else "negative" if candle_change < 0 else "neutral"
-        volume_class = "high-volume" if vol_now > vol_avg * 1.5 else "normal-volume"
+        volume_class = "high-volume" if vol_ratio > 1.5 else "normal-volume"
         
         # Color del símbolo según el tipo
         symbol_color = "#f7931a" if name == "BTC" else "#627eea" if name == "ETH" else "#9945ff"
@@ -201,24 +320,56 @@ def generate_crypto_cards(market_data, last_signals):
                 </div>
             </div>
             
-            <div class="candle-change {candle_class}" data-candle="{symbol}">
-                📈 Cambio Actual: {candle_change:+.2f}%
+            <div class="candle-change {candle_class}" data-candle="{symbol}" title="MOMENTUM 1MIN - Cómo interpretar: 📈 VERDE (+%) = Precio subiendo → Bueno para COMPRAR | 📉 ROJO (-%) = Precio bajando → Bueno para VENDER | 🔥 FUERTE >0.5% = Movimiento potente | ⚡ MEDIO 0.2-0.5% = Movimiento normal | 📊 DÉBIL <0.2% = Movimiento lento">
+                {change_emoji} Momentum 1min: {candle_change:+.2f}% {momentum_strength}
             </div>
             
             <div class="metrics-grid">
-                <div class="metric rsi-metric">
-                    <div class="metric-value" data-rsi="{symbol}">{rsi:.1f}</div>
-                    <div class="metric-label">RSI 1min</div>
+                <div class="metric rsi-metric" title="RSI 1min: Indicador de momentum inmediato. 0-30=Sobreventa (posible rebote), 30-70=Neutral, 70-100=Sobrecompra (posible caída). Ideal para timing exacto de entrada.">
+                    <div class="metric-value" data-rsi="{symbol}">{rsi_1m:.1f}</div>
+                    <div class="metric-label">📊 RSI 1min</div>
+                    <div class="metric-status">{'🔴 Sobrecompra' if rsi_1m >= 70 else '🟢 Sobreventa' if rsi_1m <= 30 else '🟡 Neutral'}</div>
                 </div>
-                <div class="metric rsi-metric">
+                <div class="metric rsi-metric" title="RSI 5min: Confirmación rápida del momentum. Más confiable que 1min, menos ruido. Perfecto para scalping - filtra señales falsas del 1min.">
+                    <div class="metric-value">{rsi_5m:.1f}</div>
+                    <div class="metric-label">⚡ RSI 5min</div>
+                    <div class="metric-status">{'🔴 Sobrecompra' if rsi_5m >= 70 else '🟢 Sobreventa' if rsi_5m <= 30 else '🟡 Neutral'}</div>
+                </div>
+                <div class="metric rsi-metric" title="RSI 15min: Tendencia general del mercado. Indica la dirección principal. Si coincide con 1m y 5m = señal muy fuerte. Evita operar contra esta tendencia.">
                     <div class="metric-value" data-rsi15="{symbol}">{rsi_15m:.1f}</div>
-                    <div class="metric-label">RSI 15min</div>
+                    <div class="metric-label">🎯 RSI 15min</div>
+                    <div class="metric-status">{'🔴 Sobrecompra' if rsi_15m >= 70 else '🟢 Sobreventa' if rsi_15m <= 30 else '🟡 Neutral'}</div>
                 </div>
-                <div class="metric volume-metric {volume_class}">
+                <div class="metric volume-metric {volume_class}" title="Volumen: Cantidad de operaciones. Ratio >1.5x = alta actividad (más confiable). Volumen alto confirma la fuerza del movimiento.">
                     <div class="metric-value" data-volume="{symbol}">{vol_now:,.0f}</div>
-                    <div class="metric-label">Volumen Actual</div>
+                    <div class="metric-label">📊 Volumen</div>
+                    <div class="metric-status">Ratio: {vol_ratio:.1f}x</div>
                 </div>
-                <div class="metric score-metric {confidence_class}">
+            </div>
+
+            <!-- Criterios de Trading ANTES del Score -->
+            <div class="criteria-section">
+                <div class="criteria-header">📋 Criterios de Trading</div>
+                <div class="criteria-grid">
+                    <div class="criteria-column">
+                        <div class="criteria-title">🟢 COMPRA</div>
+                        <div class="criteria-indicators">
+                            {generate_criteria_indicators(buy_criteria, 'buy')}
+                        </div>
+                        <div class="criteria-count">{buy_criteria.get('fulfilled', 0)}/{buy_criteria.get('total', 8)} criterios</div>
+                    </div>
+                    <div class="criteria-column">
+                        <div class="criteria-title">🔴 VENTA</div>
+                        <div class="criteria-indicators">
+                            {generate_criteria_indicators(sell_criteria, 'sell')}
+                        </div>
+                        <div class="criteria-count">{sell_criteria.get('fulfilled', 0)}/{sell_criteria.get('total', 8)} criterios</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metrics-grid" style="margin-top: 7px;">
+                <div class="metric score-metric {confidence_class}" title="Score de Confianza: Algoritmo que evalúa 8 condiciones técnicas. 90-100=Excelente (alta probabilidad), 75-89=Fuerte, 60-74=Buena, <60=Débil. Solo se envían emails con 90+ y 7/8 condiciones.">
                     <div class="metric-value" data-score="{symbol}">{confidence_emoji} {score}/100</div>
                     <div class="metric-label">{confidence_label}</div>
                 </div>
@@ -306,6 +457,21 @@ def get_dashboard_css():
             text-decoration: none; color: white;
             opacity: 1;
         }
+        .logs-btn-compact {
+            background: linear-gradient(135deg, #64748b, #475569);
+            color: white; text-decoration: none;
+            padding: 6px 12px; border-radius: 6px;
+            font-weight: 600; font-size: 0.8rem; transition: all 0.3s ease;
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            box-shadow: 0 2px 8px rgba(100, 116, 139, 0.2);
+            display: inline-block; opacity: 0.8;
+        }
+        .logs-btn-compact:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(100, 116, 139, 0.4);
+            text-decoration: none; color: white;
+            opacity: 1;
+        }
         .status-bar {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 15px; margin-bottom: 25px;
@@ -334,13 +500,60 @@ def get_dashboard_css():
         .crypto-price-container { text-align: right; }
         .crypto-price { font-size: 1.3rem; color: #34d399; font-weight: 700; }
         .price-24h { font-size: 0.75rem; margin-top: 2px; opacity: 0.8; }
+
+        .criteria-section {
+            background: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 10px;
+            margin-top: 20px; border: 1px solid #334155;
+        }
+        .criteria-header {
+            font-size: 0.9rem; font-weight: 600; color: #94a3b8;
+            text-align: center; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .criteria-column { text-align: center; }
+        .criteria-title {
+            font-size: 0.8rem; font-weight: 600; margin-bottom: 8px;
+            color: #f1f5f9; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .criteria-indicators {
+            display: flex; justify-content: center; gap: 3px; margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .criteria-dot {
+            font-size: 0.7rem; cursor: help; transition: transform 0.2s ease;
+        }
+        .criteria-dot:hover { transform: scale(1.2); }
+        .criteria-count {
+            font-size: 0.75rem; color: #94a3b8; font-weight: 600;
+        }
+
+        .status-cards {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+            margin-top: 15px; padding: 12px;
+            background: rgba(15, 23, 42, 0.4); border-radius: 8px;
+            border: 1px solid #334155;
+        }
+        .status-card {
+            text-align: center; padding: 6px 4px;
+            background: rgba(30, 41, 59, 0.6); border-radius: 6px;
+            border: 1px solid #475569;
+        }
+        .status-label {
+            font-size: 0.65rem; color: #94a3b8;
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;
+        }
+        .status-value {
+            font-size: 0.7rem; color: #f1f5f9; font-weight: 600;
+        }
         .candle-change { text-align: center; padding: 8px 12px; border-radius: 8px; font-weight: 600; margin-bottom: 15px; }
         .candle-change.positive { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
         .candle-change.negative { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
         .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+        .score-metric { grid-column: span 2; }
         .metric { background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #475569; }
         .metric-value { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }
         .metric-label { font-size: 0.8rem; color: #f1f5f9 !important; margin-top: 4px; font-weight: 500; }
+        .metric-status { font-size: 0.6rem; color: #f1f5f9 !important; margin-top: 2px; font-weight: 400; }
         .score-metric .metric-label { color: #f1f5f9 !important; font-weight: 600; }
         .trading-scenarios { margin-bottom: 15px; padding: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid #334155; }
         .scenario-title { font-size: 0.9rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; text-align: center; }
