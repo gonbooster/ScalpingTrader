@@ -255,11 +255,12 @@ def analytics():
         performance_stats, recent_signals, market_trends = get_analytics_data()
         return generate_analytics_dashboard(performance_stats, recent_signals, market_trends)
 
-    except ImportError:
-        return jsonify({"error": "Analytics module not available"}), 500
+    except ImportError as e:
+        logger.error(f"ImportError en analytics: {e}")
+        return f"<h1>Error: Analytics module not available</h1><p>{str(e)}</p>", 500
     except Exception as e:
         logger.error(f"Error en analytics: {e}")
-        return jsonify({"error": str(e)}), 500
+        return f"<h1>Error en Analytics</h1><p>{str(e)}</p>", 500
 
 @app.route('/analytics/api')
 def analytics_api():

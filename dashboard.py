@@ -52,6 +52,9 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
             <div class="header">
                 <h1>🎯 Scalping Dashboard</h1>
                 <p>BTC • ETH • SOL • Análisis en tiempo real</p>
+                <div class="header-buttons">
+                    <a href="/analytics" class="analytics-btn" target="_blank">📊 Analytics</a>
+                </div>
             </div>
 
             <div class="status-bar">
@@ -69,6 +72,9 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 </div>
                 <div class="status-item">
                     <strong>Último:</strong> {last_time}
+                </div>
+                <div class="status-item status-analytics">
+                    <a href="/analytics" target="_blank" class="analytics-status-link">📊 Analytics</a>
                 </div>
             </div>
 
@@ -245,7 +251,34 @@ def get_dashboard_css():
             background: linear-gradient(135deg, #60a5fa, #34d399);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
-        .header p { color: #94a3b8; font-size: 1rem; }
+        .header p { color: #94a3b8; font-size: 1rem; margin-bottom: 15px; }
+        .header-buttons {
+            display: flex; justify-content: center; gap: 10px; margin-top: 15px;
+        }
+        .analytics-btn {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
+            color: white !important; text-decoration: none !important;
+            padding: 12px 24px; border-radius: 10px;
+            font-weight: 700; font-size: 1rem; transition: all 0.3s ease;
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+            display: inline-block;
+        }
+        .analytics-btn:hover {
+            transform: translateY(-3px) !important;
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important;
+            text-decoration: none !important; color: white !important;
+            background: linear-gradient(135deg, #7c3aed, #5b21b6) !important;
+        }
+        .analytics-status-link {
+            color: #8b5cf6 !important; text-decoration: none !important;
+            font-weight: 600; padding: 4px 8px; border-radius: 6px;
+            background: rgba(139, 92, 246, 0.1); transition: all 0.3s ease;
+        }
+        .analytics-status-link:hover {
+            color: white !important; background: #8b5cf6 !important;
+            text-decoration: none !important;
+        }
         .status-bar {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 15px; margin-bottom: 25px;
