@@ -49,27 +49,36 @@ class TradingLogic:
             lower_close = (high_price - close_price) / candle_range > 0.6 if candle_range > 0 else False
             return volume_check and body_dominance and red_candle and lower_close
     
-    def check_signal_distance(self, symbol, current_price, signal_type):
-        """Verifica distancia mínima entre señales"""
+    def check_signal_distance(self, symbol, current_price, signal_type, score=0):
+        """Verifica distancia mínima entre señales con cooldown inteligente"""
         if symbol not in self.last_signals:
             return True
-        
+
         last_signal = self.last_signals[symbol]
         last_time = last_signal.get("time", 0)
         last_price = last_signal.get("price", 0)
         last_type = last_signal.get("type", "")
-        
-        # Cooldown de tiempo
+
+        # Cooldown inteligente basado en calidad de señal
         time_diff = time.time() - last_time
-        if time_diff < self.cooldown_time:
+
+        if score >= 95:  # SEÑALES PREMIUM (95-100)
+            cooldown = 300   # 5 minutos - Oportunidades de oro
+        elif score >= 90:  # SEÑALES EXCELENTES (90-94)
+            cooldown = 900   # 15 minutos - Muy buenas oportunidades
+        else:  # SEÑALES NORMALES (<90)
+            cooldown = self.cooldown_time  # 30 minutos - Señales regulares
+
+        if time_diff < cooldown:
+            logger.info(f"⏰ Cooldown activo: {int((cooldown - time_diff)/60)}min restantes (score: {score})")
             return False
-        
+
         # Distancia de precio (mínimo 0.5% de diferencia)
         if last_price > 0:
             price_diff = abs(current_price - last_price) / last_price
             if price_diff < 0.005:  # 0.5%
                 return False
-        
+
         return True
     
     def update_signal_tracking(self, symbol, signal_type, price):
@@ -102,9 +111,9 @@ class TradingLogic:
                 timeframe_data["1m"], "buy"
             )
         
-        # Verificar distancia de señales
+        # Verificar distancia de señales (con score para cooldown inteligente)
         conditions["Signal_distance"] = self.check_signal_distance(
-            symbol, data["price"], "buy"
+            symbol, data["price"], "buy", data["score"]
         )
         
         # Contar condiciones cumplidas
@@ -136,9 +145,9 @@ class TradingLogic:
                 timeframe_data["1m"], "sell"
             )
         
-        # Verificar distancia de señales
+        # Verificar distancia de señales (con score para cooldown inteligente)
         conditions["Signal_distance"] = self.check_signal_distance(
-            symbol, data["price"], "sell"
+            symbol, data["price"], "sell", data["score"]
         )
         
         # Contar condiciones cumplidas
@@ -161,44 +170,60 @@ class TradingLogic:
 
         return self.daily_email_count < self.max_daily_emails
 
-    def process_signal(self, symbol, signal_type, market_data, conditions):
+    def process_signal(self, symbol, signal_type, market_data, conditions, send_email=True):
         """Procesa y envía una señal de trading"""
         try:
             data = market_data[symbol]
 
-            # Verificar límite diario de emails
-            if not self.check_daily_email_limit():
-                logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails})")
-                return False
+            # Solo verificar límites de email si vamos a enviar email
+            if send_email:
+                # Verificar límite diario de emails (excepto señales premium)
+                if data["score"] < 95 and not self.check_daily_email_limit():
+                    logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails}) - Score: {data['score']}")
+                    return False
+                elif data["score"] >= 95:
+                    logger.info(f"🔥 SEÑAL PREMIUM (Score: {data['score']}) - Bypassing daily limit")
             
             # Calcular price targets
             price_targets = calculate_price_targets(
                 data["price"], data["atr"], signal_type, symbol
             )
             
-            # Enviar email
-            email_sent = send_signal_email(
-                signal_type, symbol, data["price"], data["rsi_1m"], data["rsi_15m"],
-                data["ema_fast"], data["ema_slow"], data["volume"], data["vol_avg"],
-                data["score"], data["atr"], data["candle_change_percent"],
-                conditions, price_targets
-            )
-            
-            if email_sent:
-                self.signal_count += 1
-                self.daily_email_count += 1  # Incrementar contador diario
+            # Enviar email solo si send_email=True
+            if send_email:
+                email_sent = send_signal_email(
+                    signal_type, symbol, data["price"], data["rsi_1m"], data["rsi_15m"],
+                    data["ema_fast"], data["ema_slow"], data["volume"], data["vol_avg"],
+                    data["score"], data["atr"], data["candle_change_percent"],
+                    conditions, price_targets
+                )
+
+                if email_sent:
+                    self.signal_count += 1
+                    self.daily_email_count += 1  # Incrementar contador diario
+                    self.update_signal_tracking(symbol, signal_type, data["price"])
+
+                    # Actualizar market_data
+                    market_data[symbol]["last_signal"] = signal_type
+                    market_data[symbol]["last_signal_price"] = data["price"]
+                    market_data[symbol]["last_signal_time"] = time.time()
+
+                    logger.info(f"✅ Señal {signal_type.upper()} enviada por EMAIL para {symbol}")
+                    return True
+                else:
+                    logger.error(f"❌ Error enviando señal {signal_type} para {symbol}")
+                    return False
+            else:
+                # Solo logging, sin email
                 self.update_signal_tracking(symbol, signal_type, data["price"])
-                
+
                 # Actualizar market_data
                 market_data[symbol]["last_signal"] = signal_type
                 market_data[symbol]["last_signal_price"] = data["price"]
                 market_data[symbol]["last_signal_time"] = time.time()
-                
-                logger.info(f"✅ Señal {signal_type.upper()} enviada para {symbol}")
+
+                logger.info(f"📊 Señal {signal_type.upper()} detectada para {symbol} (sin email)")
                 return True
-            else:
-                logger.error(f"❌ Error enviando señal {signal_type} para {symbol}")
-                return False
                 
         except Exception as e:
             logger.error(f"❌ Error procesando señal {signal_type} para {symbol}: {e}")
@@ -216,18 +241,18 @@ class TradingLogic:
                 )
                 
                 if buy_valid:
-                    if self.process_signal(symbol, "buy", market_data, buy_conditions):
+                    if self.process_signal(symbol, "buy", market_data, buy_conditions, send_email=True):
                         signals_sent += 1
                         continue  # No verificar sell si ya enviamos buy
-                
-                # Verificar señal de venta
+
+                # Verificar señal de venta (SIN EMAIL - solo logs)
                 sell_valid, sell_conditions = self.check_sell_conditions(
                     symbol, market_data, timeframe_data
                 )
-                
+
                 if sell_valid:
-                    if self.process_signal(symbol, "sell", market_data, sell_conditions):
-                        signals_sent += 1
+                    # SELL signals no envían email, solo se registran
+                    self.process_signal(symbol, "sell", market_data, sell_conditions, send_email=False)
                 
             except Exception as e:
                 logger.error(f"❌ Error analizando señales para {symbol}: {e}")

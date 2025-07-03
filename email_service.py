@@ -213,10 +213,18 @@ def send_signal_email(signal_type: str, symbol: str, price: float,
         conditions, price_targets
     )
     
-    # Crear subject
+    # Crear subject con prioridad basada en score
     action = "COMPRA" if signal_type == "buy" else "VENTA"
     emoji = "🟢" if signal_type == "buy" else "🔴"
-    subject = f"{emoji} {action} - {symbol} Scalping Bot"
+
+    if score >= 95:
+        priority = "🔥 PREMIUM"
+    elif score >= 90:
+        priority = "⭐ EXCELENTE"
+    else:
+        priority = ""
+
+    subject = f"{emoji} {priority} {action} - {symbol} ({score}/100)"
     
     return email_service.send_email(subject, plain_text, html_text)
 
