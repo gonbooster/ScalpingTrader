@@ -126,17 +126,52 @@ def dashboard():
         logger.error(f"❌ Error generando dashboard: {e}")
         return f"<h1>Error: {e}</h1>"
 
+def convert_bools_to_json(obj):
+    """Convierte objetos complejos a JSON serializable"""
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            # Saltar criterios complejos que causan problemas
+            if k in ['buy_criteria', 'sell_criteria']:
+                if isinstance(v, dict):
+                    # Solo mantener datos básicos
+                    result[k] = {
+                        'fulfilled': v.get('fulfilled', 0),
+                        'total': v.get('total', 8),
+                        'percentage': v.get('percentage', 0)
+                    }
+                else:
+                    result[k] = v
+            else:
+                result[k] = convert_bools_to_json(v)
+        return result
+    elif isinstance(obj, list):
+        return [convert_bools_to_json(item) for item in obj]
+    elif isinstance(obj, bool):
+        return obj
+    elif obj is None:
+        return None
+    else:
+        try:
+            # Intentar convertir a tipo básico
+            return float(obj) if isinstance(obj, (int, float)) else str(obj)
+        except:
+            return str(obj)
+
 @app.route("/api/data")
 def api_data():
     """API endpoint para datos en tiempo real"""
     try:
         market_data = get_market_data()
         trading_stats = get_trading_stats()
-        
+
+        # Convertir datos para JSON
+        market_data_json = convert_bools_to_json(market_data)
+
         return jsonify({
             "status": "success",
             "timestamp": datetime.now().isoformat(),
-            "market_data": market_data,
+            "market_data": market_data_json,
             "trading_stats": trading_stats,
             "bot_status": {
                 "running": bot_running,

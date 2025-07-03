@@ -55,21 +55,28 @@ class BinanceAPI:
         data_1m = self.get_klines(symbol, "1m", 100)
         if not data_1m:
             return {}
-        
+
         time.sleep(0.1)  # Rate limiting
-        
+
+        data_5m = self.get_klines(symbol, "5m", 50)
+        if not data_5m:
+            return {}
+
+        time.sleep(0.1)  # Rate limiting
+
         data_15m = self.get_klines(symbol, "15m", 50)
         if not data_15m:
             return {}
-        
+
         time.sleep(0.1)  # Rate limiting
-        
+
         data_1h = self.get_klines(symbol, "1h", 30)
         if not data_1h:
             return {}
         
         return {
             "1m": data_1m,
+            "5m": data_5m,
             "15m": data_15m,
             "1h": data_1h
         }

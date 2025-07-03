@@ -21,7 +21,7 @@ class MarketAnalyzer:
         data = {}
         for symbol in self.symbols:
             data[symbol] = {
-                "price": 0.0, "rsi": 0.0, "rsi_1m": 0.0, "rsi_15m": 0.0,
+                "price": 0.0, "rsi": 0.0, "rsi_1m": 0.0, "rsi_5m": 0.0, "rsi_15m": 0.0,
                 "ema_fast": 0.0, "ema_slow": 0.0, "volume": 0.0, "vol_avg": 0.0,
                 "score": 0, "last_signal": None, "pnl_daily": 0.0, "atr": 0.0,
                 "last_signal_price": 0.0, "last_signal_time": 0,
@@ -71,6 +71,7 @@ class MarketAnalyzer:
                 return False
             
             data_1m = timeframe_data["1m"]
+            data_5m = timeframe_data.get("5m", [])
             data_15m = timeframe_data.get("15m", [])
             data_1h = timeframe_data.get("1h", [])
             
@@ -103,13 +104,21 @@ class MarketAnalyzer:
             # Volumen promedio
             vol_avg = calculate_volume_sma(volumes_1m, 20)
             
-            # RSI 15m para confirmación
+            # RSI 5m para confirmación rápida
+            if data_5m and len(data_5m) >= 14:
+                prices_5m = extract_prices(data_5m)
+                closes_5m = np.array(prices_5m["closes"])
+                rsi_5m = calculate_rsi(closes_5m)
+            else:
+                rsi_5m = rsi_1m
+
+            # RSI 15m para tendencia general
             if data_15m and len(data_15m) >= 14:
                 prices_15m = extract_prices(data_15m)
                 closes_15m = np.array(prices_15m["closes"])
                 rsi_15m = calculate_rsi(closes_15m)
             else:
-                rsi_15m = rsi_1m
+                rsi_15m = rsi_5m
             
             # Macro trend (1h)
             macro_trend = True  # Simplificado por ahora
@@ -132,11 +141,16 @@ class MarketAnalyzer:
             price_targets_buy = calculate_price_targets(close_now, atr_val, "buy", symbol)
             price_targets_sell = calculate_price_targets(close_now, atr_val, "sell", symbol)
             
+            # Calcular criterios de trading para visualización
+            buy_criteria = self.calculate_buy_criteria(close_now, rsi_1m, rsi_15m, ema_fast_val, ema_slow_val, vol_now, vol_avg, confidence_score, candle_change_percent)
+            sell_criteria = self.calculate_sell_criteria(close_now, rsi_1m, rsi_15m, ema_fast_val, ema_slow_val, vol_now, vol_avg, confidence_score, candle_change_percent)
+
             # Actualizar datos del mercado
             self.market_data[symbol].update({
                 "price": close_now,
                 "rsi": rsi_1m,
                 "rsi_1m": rsi_1m,
+                "rsi_5m": rsi_5m,
                 "rsi_15m": rsi_15m,
                 "ema_fast": ema_fast_val,
                 "ema_slow": ema_slow_val,
@@ -153,7 +167,9 @@ class MarketAnalyzer:
                 "take_profit_sell": price_targets_sell["take_profit"],
                 "stop_loss_sell": price_targets_sell["stop_loss"],
                 "expected_move_sell": price_targets_sell["expected_move_percent"],
-                "risk_reward_sell": price_targets_sell["risk_reward_ratio"]
+                "risk_reward_sell": price_targets_sell["risk_reward_ratio"],
+                "buy_criteria": buy_criteria,
+                "sell_criteria": sell_criteria
             })
             
             logger.info(f"✅ {symbol}: price=${close_now:,.2f}, rsi={rsi_1m:.1f}, score={confidence_score}/100")
@@ -180,6 +196,50 @@ class MarketAnalyzer:
     def get_symbol_data(self, symbol):
         """Retorna datos de un símbolo específico"""
         return self.market_data.get(symbol, {})
+
+    def calculate_buy_criteria(self, price, rsi_1m, rsi_15m, ema_fast, ema_slow, volume, vol_avg, score, candle_change):
+        """Calcula criterios de compra para visualización"""
+        criteria = {
+            "RSI_1m_favorable": 30 <= rsi_1m <= 70,
+            "RSI_15m_bullish": rsi_15m > 50,
+            "EMA_crossover": ema_fast > ema_slow,
+            "Volume_high": volume > vol_avg * 1.2,
+            "Confidence_excellent": score >= 90,
+            "Price_above_EMA": price > ema_fast,
+            "Candle_positive": candle_change > 0.1,
+            "Signal_distance": True  # Simplificado para dashboard
+        }
+
+        fulfilled = sum(1 for v in criteria.values() if v)
+
+        return {
+            "criteria": criteria,
+            "fulfilled": fulfilled,
+            "total": len(criteria),
+            "percentage": (fulfilled / len(criteria)) * 100
+        }
+
+    def calculate_sell_criteria(self, price, rsi_1m, rsi_15m, ema_fast, ema_slow, volume, vol_avg, score, candle_change):
+        """Calcula criterios de venta para visualización"""
+        criteria = {
+            "RSI_1m_overbought": rsi_1m >= 70,
+            "RSI_15m_bearish": rsi_15m < 50,
+            "EMA_crossunder": ema_fast < ema_slow,
+            "Volume_high": volume > vol_avg * 1.2,
+            "Confidence_excellent": score >= 90,
+            "Price_below_EMA": price < ema_fast,
+            "Candle_negative": candle_change < -0.1,
+            "Signal_distance": True  # Simplificado para dashboard
+        }
+
+        fulfilled = sum(1 for v in criteria.values() if v)
+
+        return {
+            "criteria": criteria,
+            "fulfilled": fulfilled,
+            "total": len(criteria),
+            "percentage": (fulfilled / len(criteria)) * 100
+        }
 
 # Instancia global
 market_analyzer = MarketAnalyzer()
