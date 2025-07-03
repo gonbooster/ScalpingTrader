@@ -5,6 +5,14 @@ from datetime import datetime
 from email_service import send_signal_email
 from indicators import calculate_price_targets
 
+# Importar tracker de rendimiento
+try:
+    from performance_tracker import performance_tracker
+    TRACKING_ENABLED = True
+except ImportError:
+    TRACKING_ENABLED = False
+    logging.warning("Performance tracker no disponible")
+
 logger = logging.getLogger(__name__)
 
 class TradingLogic:
@@ -203,6 +211,10 @@ class TradingLogic:
                     self.daily_email_count += 1  # Incrementar contador diario
                     self.update_signal_tracking(symbol, signal_type, data["price"])
 
+                    # Registrar en performance tracker
+                    if TRACKING_ENABLED:
+                        self.record_signal_for_tracking(symbol, signal_type, data, conditions, price_targets)
+
                     # Actualizar market_data
                     market_data[symbol]["last_signal"] = signal_type
                     market_data[symbol]["last_signal_price"] = data["price"]
@@ -262,6 +274,40 @@ class TradingLogic:
         
         return signals_sent
     
+    def record_signal_for_tracking(self, symbol, signal_type, data, conditions, price_targets):
+        """Registra señal en el sistema de tracking"""
+        try:
+            signal_data = {
+                'timestamp': datetime.now().isoformat(),
+                'symbol': symbol,
+                'signal_type': signal_type,
+                'entry_price': data['price'],
+                'score': data['score'],
+                'conditions_met': sum(1 for v in conditions.values() if v),
+                'total_conditions': len(conditions),
+                'rsi_1m': data.get('rsi_1m'),
+                'rsi_15m': data.get('rsi_15m'),
+                'ema_fast': data.get('ema_fast'),
+                'ema_slow': data.get('ema_slow'),
+                'volume_ratio': data.get('volume', 0) / data.get('vol_avg', 1) if data.get('vol_avg') else 0,
+                'atr': data.get('atr'),
+                'candle_change': data.get('candle_change_percent'),
+                'tp_price': price_targets.get('tp'),
+                'sl_price': price_targets.get('sl'),
+                'expected_move': price_targets.get('expected_move'),
+                'risk_reward': price_targets.get('risk_reward'),
+                'market_conditions': {
+                    'conditions': conditions,
+                    'timeframe_data': 'multi_tf_analysis'
+                }
+            }
+
+            performance_tracker.record_signal(signal_data)
+            logger.info(f"📊 Señal registrada en tracking: {symbol} {signal_type}")
+
+        except Exception as e:
+            logger.error(f"❌ Error registrando señal en tracking: {e}")
+
     def get_stats(self):
         """Retorna estadísticas del trading"""
         return {

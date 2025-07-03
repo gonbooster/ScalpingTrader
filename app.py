@@ -246,6 +246,39 @@ def bot_status():
         "timestamp": datetime.now().isoformat()
     })
 
+@app.route('/analytics')
+def analytics():
+    """Dashboard de análisis de rendimiento (PRIVADO)"""
+    try:
+        from analytics_dashboard import get_analytics_data, generate_analytics_dashboard
+
+        performance_stats, recent_signals, market_trends = get_analytics_data()
+        return generate_analytics_dashboard(performance_stats, recent_signals, market_trends)
+
+    except ImportError:
+        return jsonify({"error": "Analytics module not available"}), 500
+    except Exception as e:
+        logger.error(f"Error en analytics: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/analytics/api')
+def analytics_api():
+    """API de datos de analytics"""
+    try:
+        from analytics_dashboard import get_analytics_data
+
+        performance_stats, recent_signals, market_trends = get_analytics_data()
+        return jsonify({
+            "performance": performance_stats,
+            "recent_signals": recent_signals[:10],  # Solo últimas 10
+            "market_trends": market_trends,
+            "timestamp": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"Error en analytics API: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # === MAIN ===
 # Inicializar bot automáticamente cuando se importa el módulo (para Gunicorn)
 def init_trading_bot():

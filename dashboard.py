@@ -118,11 +118,7 @@ def generate_crypto_cards(market_data, last_signals):
         move_sell = data.get('expected_move_sell', 0)
         rr_sell = data.get('risk_reward_sell', 0)
         
-        # Señal actual
-        signal = last_signals.get(symbol, {})
-        signal_type = signal.get('action', 'ESPERANDO')
-        signal_class = f"signal-{signal_type.lower()}"
-        signal_text = f"🎯 {signal_type}"
+        # Señal actual (eliminada - redundante con sistema de confianza)
         
         # Sistema de niveles de confianza profesional
         if score >= 90:
@@ -221,13 +217,6 @@ def generate_crypto_cards(market_data, last_signals):
                     </div>
                 </div>
             </div>
-            
-            <div class="signal-status {signal_class}" data-signal="{symbol}">
-                {signal_text}
-            </div>
-            <div class="confidence-bar">
-                <div class="confidence-fill {confidence_class}" style="width: {score}%"></div>
-            </div>
         </div>
         """
     
@@ -304,12 +293,7 @@ def get_dashboard_css():
         .target-percent { font-size: 0.65rem; color: #60a5fa; display: block; font-weight: 500; }
         .target.profit { background: rgba(34, 197, 94, 0.1); }
         .target.loss { background: rgba(239, 68, 68, 0.1); }
-        .signal-status { padding: 12px; border-radius: 10px; text-align: center; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; }
-        .signal-buy { background: linear-gradient(135deg, #22c55e, #16a34a); color: white; }
-        .signal-sell { background: linear-gradient(135deg, #ef4444, #dc2626); color: white; }
-        .signal-wait, .signal-esperando { background: linear-gradient(135deg, #6b7280, #4b5563); color: white; }
-        .confidence-bar { background: rgba(15, 23, 42, 0.6); border-radius: 12px; height: 10px; overflow: hidden; border: 1px solid #334155; }
-        .confidence-fill { height: 100%; transition: width 0.5s ease; }
+
         .confidence-poor { background: linear-gradient(90deg, #dc2626, #ef4444); }
         .confidence-weak { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
         .confidence-good { background: linear-gradient(90deg, #22c55e, #34d399); }
