@@ -257,10 +257,28 @@ def analytics():
 
     except ImportError as e:
         logger.error(f"ImportError en analytics: {e}")
-        return f"<h1>Error: Analytics module not available</h1><p>{str(e)}</p>", 500
+        return f"""
+        <html>
+        <head><title>Analytics - Error</title></head>
+        <body style="font-family: Arial; background: #1e293b; color: white; padding: 20px;">
+            <h1>❌ Error: Analytics module not available</h1>
+            <p>Error: {str(e)}</p>
+            <a href="/" style="color: #60a5fa;">← Volver al Dashboard</a>
+        </body>
+        </html>
+        """, 500
     except Exception as e:
         logger.error(f"Error en analytics: {e}")
-        return f"<h1>Error en Analytics</h1><p>{str(e)}</p>", 500
+        return f"""
+        <html>
+        <head><title>Analytics - Error</title></head>
+        <body style="font-family: Arial; background: #1e293b; color: white; padding: 20px;">
+            <h1>❌ Error en Analytics</h1>
+            <p>Error: {str(e)}</p>
+            <a href="/" style="color: #60a5fa;">← Volver al Dashboard</a>
+        </body>
+        </html>
+        """, 500
 
 @app.route('/analytics/api')
 def analytics_api():

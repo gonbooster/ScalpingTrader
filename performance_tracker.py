@@ -145,16 +145,17 @@ class PerformanceTracker:
         """Verifica el resultado de señales pendientes"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
-        # Obtener señales pendientes de las últimas 24 horas
+
+        # Obtener señales pendientes de las últimas 48 horas
         cursor.execute('''
-            SELECT * FROM signals 
-            WHERE status = 'PENDING' 
-            AND datetime(timestamp) > datetime('now', '-24 hours')
+            SELECT * FROM signals
+            WHERE status = 'PENDING'
+            AND datetime(timestamp) > datetime('now', '-48 hours')
         ''')
-        
+
         pending_signals = cursor.fetchall()
-        
+        updated_count = 0
+
         for signal in pending_signals:
             signal_id = signal[0]
             symbol = signal[2]
@@ -163,17 +164,42 @@ class PerformanceTracker:
             tp_price = signal[15]
             sl_price = signal[16]
             entry_time = datetime.fromisoformat(signal[1])
-            
+
+            # Verificar si la señal es muy antigua (más de 24h sin resolverse)
+            hours_elapsed = (datetime.now() - entry_time).total_seconds() / 3600
+            if hours_elapsed > 24:
+                # Marcar como expirada
+                current_price = self.get_current_price(symbol)
+                if current_price:
+                    actual_return = self.calculate_return(signal_type, entry_price, current_price)
+                    cursor.execute('''
+                        UPDATE signals SET
+                        status = 'EXPIRED',
+                        result = 'EXPIRED',
+                        exit_price = ?,
+                        exit_timestamp = ?,
+                        actual_return = ?,
+                        time_to_resolution = ?,
+                        notes = 'Señal expirada sin alcanzar TP/SL en 24h'
+                        WHERE id = ?
+                    ''', (
+                        current_price, datetime.now().isoformat(),
+                        actual_return, int(hours_elapsed * 60), signal_id
+                    ))
+                    updated_count += 1
+                    logger.info(f"⏰ Señal {signal_id} expirada: {actual_return:+.2f}%")
+                continue
+
             # Obtener precio actual
             current_price = self.get_current_price(symbol)
             if not current_price:
                 continue
-            
+
             # Verificar si se alcanzó TP o SL
             result = self.check_tp_sl_hit(
                 signal_type, entry_price, current_price, tp_price, sl_price
             )
-            
+
             if result:
                 # Actualizar resultado
                 exit_time = datetime.now()
@@ -181,9 +207,9 @@ class PerformanceTracker:
                 actual_return = self.calculate_return(
                     signal_type, entry_price, current_price
                 )
-                
+
                 cursor.execute('''
-                    UPDATE signals SET 
+                    UPDATE signals SET
                     status = 'COMPLETED',
                     result = ?,
                     exit_price = ?,
@@ -195,12 +221,147 @@ class PerformanceTracker:
                     result, current_price, exit_time.isoformat(),
                     actual_return, time_to_resolution, signal_id
                 ))
-                
-                logger.info(f"📊 Señal {signal_id} completada: {result} ({actual_return:.2f}%)")
-        
+
+                updated_count += 1
+                win_emoji = "🎯" if "WIN" in result else "❌"
+                logger.info(f"📊 {win_emoji} Señal {signal_id} completada: {result} ({actual_return:+.2f}%)")
+
         conn.commit()
         conn.close()
-    
+
+        if updated_count > 0:
+            logger.info(f"📊 Actualizadas {updated_count} señales")
+
+        return updated_count
+
+    def calculate_streaks(self, streak_data):
+        """Calcula rachas ganadoras y perdedoras"""
+        if not streak_data:
+            return 0, 0, 0
+
+        current_streak = 0
+        max_win_streak = 0
+        max_loss_streak = 0
+        current_win_streak = 0
+        current_loss_streak = 0
+
+        last_result = None
+
+        for result, timestamp, symbol in streak_data:
+            if result and 'WIN' in result:
+                if last_result and 'WIN' in last_result:
+                    current_win_streak += 1
+                else:
+                    current_win_streak = 1
+                    current_loss_streak = 0
+                max_win_streak = max(max_win_streak, current_win_streak)
+                current_streak = current_win_streak
+
+            elif result and 'LOSS' in result:
+                if last_result and 'LOSS' in last_result:
+                    current_loss_streak += 1
+                else:
+                    current_loss_streak = 1
+                    current_win_streak = 0
+                max_loss_streak = max(max_loss_streak, current_loss_streak)
+                current_streak = -current_loss_streak
+
+            last_result = result
+
+        return current_streak, max_win_streak, max_loss_streak
+
+    def get_sample_stats(self):
+        """Retorna datos de ejemplo cuando no hay datos reales"""
+        return {
+            'total_signals': 0,
+            'wins': 0,
+            'losses': 0,
+            'expired': 0,
+            'pending': 0,
+            'win_rate': 0,
+            'avg_return': 0,
+            'avg_score': 0,
+            'avg_time_minutes': 0,
+            'best_return': 0,
+            'worst_return': 0,
+            'total_profit': 0,
+            'total_loss': 0,
+            'net_profit': 0,
+            'score_breakdown': [
+                {
+                    'range': 'PREMIUM (95-100)',
+                    'count': 0,
+                    'wins': 0,
+                    'win_rate': 0,
+                    'avg_return': 0,
+                    'best_return': 0,
+                    'worst_return': 0
+                },
+                {
+                    'range': 'EXCELLENT (90-94)',
+                    'count': 0,
+                    'wins': 0,
+                    'win_rate': 0,
+                    'avg_return': 0,
+                    'best_return': 0,
+                    'worst_return': 0
+                }
+            ],
+            'symbol_breakdown': [
+                {
+                    'symbol': 'BTCUSDT',
+                    'count': 0,
+                    'wins': 0,
+                    'win_rate': 0,
+                    'avg_return': 0,
+                    'avg_score': 0
+                },
+                {
+                    'symbol': 'ETHUSDT',
+                    'count': 0,
+                    'wins': 0,
+                    'win_rate': 0,
+                    'avg_return': 0,
+                    'avg_score': 0
+                },
+                {
+                    'symbol': 'SOLUSDT',
+                    'count': 0,
+                    'wins': 0,
+                    'win_rate': 0,
+                    'avg_return': 0,
+                    'avg_score': 0
+                }
+            ],
+            'hourly_breakdown': [],
+            'volatility_analysis': [
+                {
+                    'symbol': 'BTCUSDT',
+                    'avg_volatility': 0,
+                    'max_volatility': 0,
+                    'count': 0
+                },
+                {
+                    'symbol': 'ETHUSDT',
+                    'avg_volatility': 0,
+                    'max_volatility': 0,
+                    'count': 0
+                },
+                {
+                    'symbol': 'SOLUSDT',
+                    'avg_volatility': 0,
+                    'max_volatility': 0,
+                    'count': 0
+                }
+            ],
+            'streak_analysis': {
+                'current_streak': 0,
+                'max_win_streak': 0,
+                'max_loss_streak': 0,
+                'streak_status': 'NEUTRAL'
+            }
+        }
+
     def get_current_price(self, symbol: str) -> Optional[float]:
         """Obtiene el precio actual de Binance"""
         try:
@@ -235,30 +396,44 @@ class PerformanceTracker:
             return ((entry_price - exit_price) / entry_price) * 100
     
     def get_performance_stats(self, days: int = 30) -> Dict:
-        """Obtiene estadísticas de rendimiento"""
+        """Obtiene estadísticas de rendimiento completas"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
+        # Debug: Verificar si hay datos
+        cursor.execute('SELECT COUNT(*) FROM signals')
+        total_count = cursor.fetchone()[0]
+        logger.info(f"📊 Total señales en BD: {total_count}")
+
+        cursor.execute('SELECT COUNT(*) FROM signals WHERE status = "PENDING"')
+        pending_count = cursor.fetchone()[0]
+        logger.info(f"📊 Señales pendientes: {pending_count}")
+
         # Estadísticas básicas
         cursor.execute('''
-            SELECT 
+            SELECT
                 COUNT(*) as total_signals,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN result = 'EXPIRED' THEN 1 ELSE 0 END) as expired,
                 AVG(actual_return) as avg_return,
                 AVG(score) as avg_score,
-                AVG(time_to_resolution) as avg_time_minutes
-            FROM signals 
-            WHERE status = 'COMPLETED'
+                AVG(time_to_resolution) as avg_time_minutes,
+                MAX(actual_return) as best_return,
+                MIN(actual_return) as worst_return,
+                SUM(CASE WHEN result LIKE 'WIN%' THEN actual_return ELSE 0 END) as total_profit,
+                SUM(CASE WHEN result LIKE 'LOSS%' THEN actual_return ELSE 0 END) as total_loss
+            FROM signals
+            WHERE status IN ('COMPLETED', 'EXPIRED')
             AND datetime(timestamp) > datetime('now', '-{} days')
         '''.format(days))
-        
+
         basic_stats = cursor.fetchone()
-        
+
         # Estadísticas por score
         cursor.execute('''
-            SELECT 
-                CASE 
+            SELECT
+                CASE
                     WHEN score >= 95 THEN 'PREMIUM (95-100)'
                     WHEN score >= 90 THEN 'EXCELLENT (90-94)'
                     WHEN score >= 80 THEN 'GOOD (80-89)'
@@ -266,39 +441,156 @@ class PerformanceTracker:
                 END as score_range,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
-                AVG(actual_return) as avg_return
-            FROM signals 
-            WHERE status = 'COMPLETED'
+                AVG(actual_return) as avg_return,
+                MAX(actual_return) as best_return,
+                MIN(actual_return) as worst_return
+            FROM signals
+            WHERE status IN ('COMPLETED', 'EXPIRED')
             AND datetime(timestamp) > datetime('now', '-{} days')
             GROUP BY score_range
+            ORDER BY MIN(score) DESC
         '''.format(days))
-        
+
         score_stats = cursor.fetchall()
-        
+
+        # Estadísticas por símbolo
+        cursor.execute('''
+            SELECT
+                symbol,
+                COUNT(*) as count,
+                SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
+                AVG(actual_return) as avg_return,
+                AVG(score) as avg_score
+            FROM signals
+            WHERE status IN ('COMPLETED', 'EXPIRED')
+            AND datetime(timestamp) > datetime('now', '-{} days')
+            GROUP BY symbol
+            ORDER BY count DESC
+        '''.format(days))
+
+        symbol_stats = cursor.fetchall()
+
+        # Estadísticas por horario
+        cursor.execute('''
+            SELECT
+                strftime('%H', timestamp) as hour,
+                COUNT(*) as count,
+                SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
+                AVG(actual_return) as avg_return
+            FROM signals
+            WHERE status IN ('COMPLETED', 'EXPIRED')
+            AND datetime(timestamp) > datetime('now', '-{} days')
+            GROUP BY hour
+            ORDER BY count DESC
+        '''.format(days))
+
+        hourly_stats = cursor.fetchall()
+
+        # Análisis de volatilidad por símbolo
+        cursor.execute('''
+            SELECT
+                symbol,
+                AVG(ABS(actual_return)) as avg_volatility,
+                MAX(ABS(actual_return)) as max_volatility,
+                COUNT(*) as count
+            FROM signals
+            WHERE status IN ('COMPLETED', 'EXPIRED')
+            AND datetime(timestamp) > datetime('now', '-{} days')
+            GROUP BY symbol
+        '''.format(days))
+
+        volatility_stats = cursor.fetchall()
+
+        # Análisis de streaks (rachas)
+        cursor.execute('''
+            SELECT
+                result,
+                timestamp,
+                symbol
+            FROM signals
+            WHERE status IN ('COMPLETED', 'EXPIRED')
+            AND datetime(timestamp) > datetime('now', '-{} days')
+            ORDER BY timestamp DESC
+        '''.format(days))
+
+        streak_data = cursor.fetchall()
+        current_streak, max_win_streak, max_loss_streak = self.calculate_streaks(streak_data)
+
         conn.close()
-        
+
         total_signals = basic_stats[0] or 0
         wins = basic_stats[1] or 0
+        losses = basic_stats[2] or 0
+        expired = basic_stats[3] or 0
         win_rate = (wins / total_signals * 100) if total_signals > 0 else 0
-        
+
+        # Si no hay datos, mostrar mensaje informativo
+        if total_signals == 0:
+            logger.info("📊 No hay señales registradas aún. Esperando primera señal...")
+
         return {
             'total_signals': total_signals,
             'wins': wins,
-            'losses': basic_stats[2] or 0,
+            'losses': losses,
+            'expired': expired,
+            'pending': 0,  # Se calculará en tiempo real
             'win_rate': win_rate,
-            'avg_return': basic_stats[3] or 0,
-            'avg_score': basic_stats[4] or 0,
-            'avg_time_minutes': basic_stats[5] or 0,
+            'avg_return': basic_stats[4] or 0,
+            'avg_score': basic_stats[5] or 0,
+            'avg_time_minutes': basic_stats[6] or 0,
+            'best_return': basic_stats[7] or 0,
+            'worst_return': basic_stats[8] or 0,
+            'total_profit': basic_stats[9] or 0,
+            'total_loss': basic_stats[10] or 0,
+            'net_profit': (basic_stats[9] or 0) + (basic_stats[10] or 0),
             'score_breakdown': [
                 {
                     'range': row[0],
                     'count': row[1],
                     'wins': row[2],
                     'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
-                    'avg_return': row[3] or 0
+                    'avg_return': row[3] or 0,
+                    'best_return': row[4] or 0,
+                    'worst_return': row[5] or 0
                 }
                 for row in score_stats
-            ]
+            ],
+            'symbol_breakdown': [
+                {
+                    'symbol': row[0],
+                    'count': row[1],
+                    'wins': row[2],
+                    'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
+                    'avg_return': row[3] or 0,
+                    'avg_score': row[4] or 0
+                }
+                for row in symbol_stats
+            ],
+            'hourly_breakdown': [
+                {
+                    'hour': f"{row[0]}:00",
+                    'count': row[1],
+                    'wins': row[2],
+                    'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
+                    'avg_return': row[3] or 0
+                }
+                for row in hourly_stats
+            ],
+            'volatility_analysis': [
+                {
+                    'symbol': row[0],
+                    'avg_volatility': row[1] or 0,
+                    'max_volatility': row[2] or 0,
+                    'count': row[3]
+                }
+                for row in volatility_stats
+            ],
+            'streak_analysis': {
+                'current_streak': current_streak,
+                'max_win_streak': max_win_streak,
+                'max_loss_streak': max_loss_streak,
+                'streak_status': 'WIN' if current_streak > 0 else 'LOSS' if current_streak < 0 else 'NEUTRAL'
+            }
         }
 
 # Instancia global

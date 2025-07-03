@@ -229,6 +229,10 @@ class TradingLogic:
                 # Solo logging, sin email
                 self.update_signal_tracking(symbol, signal_type, data["price"])
 
+                # Registrar en performance tracker TAMBIÉN (para análisis)
+                if TRACKING_ENABLED:
+                    self.record_signal_for_tracking(symbol, signal_type, data, conditions, price_targets)
+
                 # Actualizar market_data
                 market_data[symbol]["last_signal"] = signal_type
                 market_data[symbol]["last_signal_price"] = data["price"]
@@ -244,7 +248,21 @@ class TradingLogic:
     def analyze_signals(self, market_data, timeframe_data=None):
         """Analiza señales para todos los símbolos"""
         signals_sent = 0
-        
+
+        # Verificar resultados de señales pendientes cada 10 ciclos
+        if hasattr(self, 'cycle_count'):
+            self.cycle_count += 1
+        else:
+            self.cycle_count = 1
+
+        if self.cycle_count % 10 == 0 and TRACKING_ENABLED:
+            try:
+                updated = performance_tracker.check_signal_outcomes()
+                if updated > 0:
+                    logger.info(f"📊 Verificadas {updated} señales pendientes")
+            except Exception as e:
+                logger.error(f"❌ Error verificando señales: {e}")
+
         for symbol in market_data:
             try:
                 # Verificar señal de compra

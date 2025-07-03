@@ -111,25 +111,31 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="stat-card">
                     <div class="stat-value win-rate">{total_signals}</div>
                     <div class="stat-label">Total Señales</div>
-                    <div class="stat-trend">Últimos 30 días</div>
+                    <div class="stat-trend">✅ {performance_stats.get('wins', 0)} wins • ❌ {performance_stats.get('losses', 0)} losses • ⏰ {performance_stats.get('expired', 0)} expired</div>
                 </div>
-                
+
                 <div class="stat-card">
                     <div class="stat-value {'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'}">{win_rate:.1f}%</div>
                     <div class="stat-label">Win Rate</div>
                     <div class="stat-trend">{'🎯 Excelente' if win_rate >= 70 else '✅ Bueno' if win_rate >= 60 else '⚠️ Mejorable' if win_rate >= 50 else '❌ Revisar'}</div>
                 </div>
-                
+
                 <div class="stat-card">
                     <div class="stat-value {'win-rate' if avg_return > 0 else 'loss-rate'}">{avg_return:+.2f}%</div>
                     <div class="stat-label">Retorno Promedio</div>
-                    <div class="stat-trend">Por señal completada</div>
+                    <div class="stat-trend">💰 Mejor: {performance_stats.get('best_return', 0):+.2f}% • 📉 Peor: {performance_stats.get('worst_return', 0):+.2f}%</div>
                 </div>
-                
+
+                <div class="stat-card">
+                    <div class="stat-value {'win-rate' if performance_stats.get('net_profit', 0) > 0 else 'loss-rate'}">{performance_stats.get('net_profit', 0):+.2f}%</div>
+                    <div class="stat-label">Profit Neto</div>
+                    <div class="stat-trend">📈 Total: {performance_stats.get('total_profit', 0):+.2f}% • 📉 Pérdidas: {performance_stats.get('total_loss', 0):+.2f}%</div>
+                </div>
+
                 <div class="stat-card">
                     <div class="stat-value neutral">{performance_stats.get('avg_score', 0):.0f}/100</div>
                     <div class="stat-label">Score Promedio</div>
-                    <div class="stat-trend">Confianza media</div>
+                    <div class="stat-trend">⏱️ Tiempo medio: {performance_stats.get('avg_time_minutes', 0):.0f} min</div>
                 </div>
             </div>
             
@@ -140,11 +146,43 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                         {generate_score_breakdown(performance_stats.get('score_breakdown', []))}
                     </div>
                 </div>
-                
+
                 <div class="chart-card">
-                    <div class="chart-title">⏱️ Métricas de Tiempo</div>
+                    <div class="chart-title">💰 Análisis por Símbolo</div>
+                    <div class="score-breakdown">
+                        {generate_symbol_breakdown(performance_stats.get('symbol_breakdown', []))}
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">🕐 Mejores Horarios</div>
+                    <div class="score-breakdown">
+                        {generate_hourly_breakdown(performance_stats.get('hourly_breakdown', []))}
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">📊 Análisis de Volatilidad</div>
+                    <div class="score-breakdown">
+                        {generate_volatility_breakdown(performance_stats.get('volatility_analysis', []))}
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">🔥 Análisis de Rachas</div>
+                    <div class="score-breakdown">
+                        {generate_streak_analysis(performance_stats.get('streak_analysis', {}))}
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">⏱️ Métricas de Sistema</div>
                     <div class="score-item">
-                        <span class="score-range">Tiempo Promedio</span>
+                        <span class="score-range">Tiempo Promedio TP/SL</span>
                         <span class="score-stats">{performance_stats.get('avg_time_minutes', 0):.0f} minutos</span>
                     </div>
                     <div class="score-item">
@@ -154,6 +192,10 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     <div class="score-item">
                         <span class="score-range">Última Actualización</span>
                         <span class="score-stats">{datetime.now().strftime('%H:%M:%S')}</span>
+                    </div>
+                    <div class="score-item">
+                        <span class="score-range">Fiabilidad Sistema</span>
+                        <span class="score-stats">{'🎯 Alta' if win_rate >= 60 else '⚠️ Media' if win_rate >= 50 else '❌ Baja'}</span>
                     </div>
                 </div>
             </div>
@@ -199,15 +241,67 @@ def generate_score_breakdown(score_breakdown):
     """Genera el desglose de rendimiento por score"""
     if not score_breakdown:
         return "<div class='score-item'><span>No hay datos suficientes</span></div>"
-    
+
     html = ""
     for item in score_breakdown:
         win_rate = item.get('win_rate', 0)
         color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
-        
+
         html += f"""
         <div class="score-item">
             <span class="score-range">{item['range']}</span>
+            <div class="score-stats">
+                <span class="{color_class}">{win_rate:.1f}% WR</span>
+                <span>{item['count']} señales</span>
+                <span>{item.get('avg_return', 0):+.2f}%</span>
+                <span>📈 {item.get('best_return', 0):+.1f}%</span>
+            </div>
+        </div>
+        """
+    return html
+
+def generate_symbol_breakdown(symbol_breakdown):
+    """Genera el desglose de rendimiento por símbolo"""
+    if not symbol_breakdown:
+        return "<div class='score-item'><span>No hay datos suficientes</span></div>"
+
+    html = ""
+    for item in symbol_breakdown:
+        win_rate = item.get('win_rate', 0)
+        color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
+
+        # Emoji por símbolo
+        emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item['symbol'], "💰")
+
+        html += f"""
+        <div class="score-item">
+            <span class="score-range">{emoji} {item['symbol']}</span>
+            <div class="score-stats">
+                <span class="{color_class}">{win_rate:.1f}% WR</span>
+                <span>{item['count']} señales</span>
+                <span>{item.get('avg_return', 0):+.2f}%</span>
+                <span>📊 {item.get('avg_score', 0):.0f}/100</span>
+            </div>
+        </div>
+        """
+    return html
+
+def generate_hourly_breakdown(hourly_breakdown):
+    """Genera el desglose de rendimiento por horario"""
+    if not hourly_breakdown:
+        return "<div class='score-item'><span>No hay datos suficientes</span></div>"
+
+    # Ordenar por win rate
+    sorted_hours = sorted(hourly_breakdown, key=lambda x: x.get('win_rate', 0), reverse=True)[:8]
+
+    html = ""
+    for item in sorted_hours:
+        win_rate = item.get('win_rate', 0)
+        color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
+
+        html += f"""
+        <div class="score-item">
+            <span class="score-range">🕐 {item['hour']}</span>
             <div class="score-stats">
                 <span class="{color_class}">{win_rate:.1f}% WR</span>
                 <span>{item['count']} señales</span>
@@ -284,3 +378,72 @@ def get_analytics_data():
     market_trends = {}
     
     return performance_stats, recent_signals, market_trends
+
+def generate_volatility_breakdown(volatility_analysis):
+    """Genera el análisis de volatilidad por símbolo"""
+    if not volatility_analysis:
+        return "<div class='score-item'><span>No hay datos de volatilidad</span></div>"
+
+    html = ""
+    for item in volatility_analysis:
+        emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item['symbol'], "💰")
+        volatility_level = "🔥 Alta" if item['avg_volatility'] > 3 else "⚡ Media" if item['avg_volatility'] > 1.5 else "📊 Baja"
+
+        html += f"""
+        <div class="score-item">
+            <span class="score-range">{emoji} {item['symbol']}</span>
+            <div class="score-stats">
+                <span>{volatility_level}</span>
+                <span>Promedio: {item['avg_volatility']:.2f}%</span>
+                <span>Máximo: {item['max_volatility']:.2f}%</span>
+                <span>{item['count']} señales</span>
+            </div>
+        </div>
+        """
+    return html
+
+def generate_streak_analysis(streak_analysis):
+    """Genera el análisis de rachas"""
+    if not streak_analysis:
+        return "<div class='score-item'><span>No hay datos de rachas</span></div>"
+
+    current_streak = streak_analysis.get('current_streak', 0)
+    max_win_streak = streak_analysis.get('max_win_streak', 0)
+    max_loss_streak = streak_analysis.get('max_loss_streak', 0)
+    streak_status = streak_analysis.get('streak_status', 'NEUTRAL')
+
+    # Determinar emoji y color para racha actual
+    if current_streak > 0:
+        current_emoji = "🔥"
+        current_color = "win-rate"
+        current_text = f"Ganando {current_streak}"
+    elif current_streak < 0:
+        current_emoji = "❄️"
+        current_color = "loss-rate"
+        current_text = f"Perdiendo {abs(current_streak)}"
+    else:
+        current_emoji = "⚖️"
+        current_color = "neutral"
+        current_text = "Neutral"
+
+    html = f"""
+    <div class="score-item">
+        <span class="score-range">🎯 Racha Actual</span>
+        <div class="score-stats">
+            <span class="{current_color}">{current_emoji} {current_text}</span>
+        </div>
+    </div>
+    <div class="score-item">
+        <span class="score-range">🏆 Mejor Racha Ganadora</span>
+        <div class="score-stats">
+            <span class="win-rate">🔥 {max_win_streak} seguidas</span>
+        </div>
+    </div>
+    <div class="score-item">
+        <span class="score-range">💀 Peor Racha Perdedora</span>
+        <div class="score-stats">
+            <span class="loss-rate">❄️ {max_loss_streak} seguidas</span>
+        </div>
+    </div>
+    """
+    return html

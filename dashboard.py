@@ -1,7 +1,22 @@
 # dashboard.py - Frontend y dashboard web
 from datetime import datetime
 
-def generate_dashboard_html(market_data, last_signals, signal_count, bot_running, 
+def get_24h_price_change(symbol, current_price):
+    """Obtiene el cambio de precio en 24h desde Binance"""
+    try:
+        import requests
+        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            price_change_percent = float(data.get('priceChangePercent', 0))
+            price_24h_ago = current_price / (1 + price_change_percent / 100)
+            return price_24h_ago, price_change_percent
+    except Exception as e:
+        print(f"Error obteniendo datos 24h para {symbol}: {e}")
+    return None, 0
+
+def generate_dashboard_html(market_data, last_signals, signal_count, bot_running,
                           last_analysis_time, using_simulation, email_status):
     """Genera el HTML completo del dashboard"""
     
@@ -53,7 +68,7 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 <h1>🎯 Scalping Dashboard</h1>
                 <p>BTC • ETH • SOL • Análisis en tiempo real</p>
                 <div class="header-buttons">
-                    <a href="/analytics" class="analytics-btn" target="_blank">📊 Analytics</a>
+                    <a href="/analytics" class="analytics-btn-compact" target="_blank">📊 Analytics</a>
                 </div>
             </div>
 
@@ -72,9 +87,6 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 </div>
                 <div class="status-item">
                     <strong>Último:</strong> {last_time}
-                </div>
-                <div class="status-item status-analytics">
-                    <a href="/analytics" target="_blank" class="analytics-status-link">📊 Analytics</a>
                 </div>
             </div>
 
@@ -103,7 +115,7 @@ def generate_crypto_cards(market_data, last_signals):
     for symbol, data in market_data.items():
         # Datos básicos
         name = symbol.replace('USDT', '')
-        price = f"${data.get('price', 0):,.2f}"
+        price_raw = data.get('price', 0)  # Precio sin formatear
         rsi = data.get('rsi', 0)
         rsi_15m = data.get('rsi_15m', 0)
         score = data.get('score', 0)
@@ -155,14 +167,38 @@ def generate_crypto_cards(market_data, last_signals):
         # Color del símbolo según el tipo
         symbol_color = "#f7931a" if name == "BTC" else "#627eea" if name == "ETH" else "#9945ff"
         symbol_icon = "₿" if name == "BTC" else "Ξ" if name == "ETH" else "◎"
-        
+
+        # Convertir precio a float si es string
+        try:
+            price_float = float(price_raw) if isinstance(price_raw, str) else price_raw
+        except (ValueError, TypeError):
+            price_float = 0.0
+
+        # Obtener datos de precio 24h anterior
+        price_24h_ago, price_change_24h = get_24h_price_change(symbol, price_float)
+
+        # Formatear precio actual
+        price_display = f"${price_float:,.2f}"
+
+        # Formatear precio 24h anterior y cambio
+        if price_24h_ago and price_24h_ago > 0:
+            price_24h_display = f"${price_24h_ago:,.2f}"
+            change_color = "#22c55e" if price_change_24h > 0 else "#ef4444" if price_change_24h < 0 else "#94a3b8"
+            change_emoji = "📈" if price_change_24h > 0 else "📉" if price_change_24h < 0 else "➡️"
+            price_24h_info = f'<div class="price-24h" style="font-size: 0.75rem; color: {change_color}; margin-top: 2px;">{change_emoji} 24h: {price_24h_display} ({price_change_24h:+.2f}%)</div>'
+        else:
+            price_24h_info = ""
+
         crypto_cards += f"""
         <div class="crypto-card {name.lower()}" data-symbol="{symbol}" style="border-left: 4px solid {symbol_color};">
             <div class="crypto-header">
                 <div class="crypto-name" style="color: {symbol_color};">
                     <span class="crypto-icon">{symbol_icon}</span> {name}
                 </div>
-                <div class="crypto-price" data-price="{symbol}">{price}</div>
+                <div class="crypto-price-container">
+                    <div class="crypto-price" data-price="{symbol}">{price_display}</div>
+                    {price_24h_info}
+                </div>
             </div>
             
             <div class="candle-change {candle_class}" data-candle="{symbol}">
@@ -253,31 +289,22 @@ def get_dashboard_css():
         }
         .header p { color: #94a3b8; font-size: 1rem; margin-bottom: 15px; }
         .header-buttons {
-            display: flex; justify-content: center; gap: 10px; margin-top: 15px;
+            display: flex; justify-content: center; gap: 10px; margin-top: 10px;
         }
-        .analytics-btn {
-            background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
-            color: white !important; text-decoration: none !important;
-            padding: 12px 24px; border-radius: 10px;
-            font-weight: 700; font-size: 1rem; transition: all 0.3s ease;
-            border: 2px solid rgba(139, 92, 246, 0.5);
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
-            display: inline-block;
+        .analytics-btn-compact {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white; text-decoration: none;
+            padding: 6px 12px; border-radius: 6px;
+            font-weight: 600; font-size: 0.8rem; transition: all 0.3s ease;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
+            display: inline-block; opacity: 0.8;
         }
-        .analytics-btn:hover {
-            transform: translateY(-3px) !important;
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6) !important;
-            text-decoration: none !important; color: white !important;
-            background: linear-gradient(135deg, #7c3aed, #5b21b6) !important;
-        }
-        .analytics-status-link {
-            color: #8b5cf6 !important; text-decoration: none !important;
-            font-weight: 600; padding: 4px 8px; border-radius: 6px;
-            background: rgba(139, 92, 246, 0.1); transition: all 0.3s ease;
-        }
-        .analytics-status-link:hover {
-            color: white !important; background: #8b5cf6 !important;
-            text-decoration: none !important;
+        .analytics-btn-compact:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+            text-decoration: none; color: white;
+            opacity: 1;
         }
         .status-bar {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -304,7 +331,9 @@ def get_dashboard_css():
             margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #475569;
         }
         .crypto-name { font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .crypto-price-container { text-align: right; }
         .crypto-price { font-size: 1.3rem; color: #34d399; font-weight: 700; }
+        .price-24h { font-size: 0.75rem; margin-top: 2px; opacity: 0.8; }
         .candle-change { text-align: center; padding: 8px 12px; border-radius: 8px; font-weight: 600; margin-bottom: 15px; }
         .candle-change.positive { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
         .candle-change.negative { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
@@ -362,6 +391,40 @@ def get_dashboard_js():
                 updateElement(`[data-price="${symbol}"]`, `$${symbolData.price?.toLocaleString()}`);
                 updateElement(`[data-rsi="${symbol}"]`, symbolData.rsi?.toFixed(1));
                 updateElement(`[data-score="${symbol}"]`, `${symbolData.score}/100`);
+
+                // Actualizar etiquetas de confianza si es necesario
+                const scoreValue = symbolData.score || 0;
+                let confidenceLabel = "";
+                let confidenceEmoji = "";
+
+                if (scoreValue >= 90) {
+                    confidenceLabel = "EXCELENTE";
+                    confidenceEmoji = "🔥";
+                } else if (scoreValue >= 75) {
+                    confidenceLabel = "FUERTE";
+                    confidenceEmoji = "🎯";
+                } else if (scoreValue >= 60) {
+                    confidenceLabel = "BUENA";
+                    confidenceEmoji = "✅";
+                } else if (scoreValue >= 40) {
+                    confidenceLabel = "DÉBIL";
+                    confidenceEmoji = "⚠️";
+                } else {
+                    confidenceLabel = "POBRE";
+                    confidenceEmoji = "❌";
+                }
+
+                // Actualizar la etiqueta de confianza
+                const scoreElement = document.querySelector(`[data-score="${symbol}"]`);
+                if (scoreElement) {
+                    scoreElement.textContent = `${confidenceEmoji} ${scoreValue}/100`;
+                }
+
+                // Actualizar la etiqueta de confianza
+                const labelElement = scoreElement?.parentElement?.querySelector('.metric-label');
+                if (labelElement) {
+                    labelElement.textContent = confidenceLabel;
+                }
             });
 
             // Actualizar timestamp si está disponible
@@ -385,10 +448,17 @@ def get_dashboard_js():
                 updateElement('.status-item:nth-child(5)', `<strong>Último:</strong> ${timeStr} (${agoStr})`);
             }
         }
-        
+
         function updateElement(selector, value) {
             const element = document.querySelector(selector);
-            if (element && value) element.textContent = value;
+            if (element && value) {
+                // Si contiene HTML, usar innerHTML, sino textContent
+                if (value.includes('<') && value.includes('>')) {
+                    element.innerHTML = value;
+                } else {
+                    element.textContent = value;
+                }
+            }
         }
         
         function showUpdateIndicator() {
