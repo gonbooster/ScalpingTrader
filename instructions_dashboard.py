@@ -400,87 +400,88 @@ def generate_instructions_dashboard():
                 <h2>✅ Los 8 Criterios de Trading Explicados</h2>
 
                 <div class="criteria-explanation">
-                    <h3>🤔 ¿Por qué 8 criterios?</h3>
-                    <p>El sistema evalúa 8 condiciones diferentes para asegurar que una señal sea realmente buena.
-                    <strong>Cuantos más criterios se cumplan, más probable es que la operación sea exitosa.</strong></p>
+                    <h3>🤔 ¿Cómo funciona el sistema?</h3>
+                    <p>El sistema evalúa estos 8 criterios técnicos específicos en tiempo real.
+                    <strong>Cada criterio cumplido aumenta la probabilidad de éxito de la operación.</strong></p>
 
-                    <p><strong>📊 Regla del sistema:</strong> Se necesitan mínimo <strong>6 de 8 criterios</strong> para considerar una señal válida.</p>
+                    <p><strong>📊 Progress Bar:</strong> Muestra (criterios cumplidos / 8) × 100 + bonus por score alto (≥75)</p>
+                    <p><strong>🎯 Señales:</strong> Solo se envían emails para señales BUY con alta probabilidad</p>
                 </div>
 
-                <h3>📋 Los 8 Criterios Detallados:</h3>
+                <h3>📋 Los 8 Criterios Reales del Sistema:</h3>
 
                 <div class="criteria-list">
                     <div class="criteria-item">
-                        <strong>1. 📈 Tendencia de Precio</strong>
-                        ¿El precio está subiendo o bajando claramente?
-                        <br><em>Ejemplo: Si queremos comprar, el precio debe estar en tendencia alcista.</em>
+                        <strong>1. 🔴 RSI1 - RSI 1 minuto</strong>
+                        RSI entre 30-70 (zona favorable para trading)
+                        <br><em>Evita zonas extremas de sobrecompra (>70) o sobreventa (<30)</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>2. 🔴 RSI 1 minuto</strong>
-                        ¿El RSI de 1 minuto confirma la dirección?
-                        <br><em>Para comprar: RSI < 70 (no sobrecomprado)</em>
+                        <strong>2. 📊 RSI15 - RSI 15 minutos</strong>
+                        RSI > 50 (tendencia alcista confirmada)
+                        <br><em>Timeframe más estable que confirma la dirección general</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>3. 📊 RSI 5 minutos</strong>
-                        ¿El RSI de 5 minutos está en zona favorable?
-                        <br><em>Más confiable que el de 1 minuto</em>
+                        <strong>3. 📈 EMA - Cruce de Medias</strong>
+                        EMA rápida (10) > EMA lenta (21) - Tendencia alcista
+                        <br><em>Las medias móviles confirman la dirección del mercado</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>4. 📉 RSI 15 minutos</strong>
-                        ¿El RSI de 15 minutos confirma la tendencia general?
-                        <br><em>El más estable de los tres RSI</em>
+                        <strong>4. 📦 VOL - Volumen Elevado</strong>
+                        Volumen > 1.2x promedio (interés del mercado)
+                        <br><em>Más volumen = mayor confianza en la señal</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>5. ⚡ Momentum Positivo</strong>
-                        ¿El precio está acelerando en la dirección correcta?
-                        <br><em>Para comprar: momentum > 0 (acelerando hacia arriba)</em>
+                        <strong>5. 🎯 CONF - Score de Confianza</strong>
+                        Score ≥ 75/100 (calidad algorítmica alta)
+                        <br><em>Algoritmo sofisticado que combina múltiples indicadores</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>6. 📊 Volumen Alto</strong>
-                        ¿Hay suficiente dinero moviéndose en el mercado?
-                        <br><em>Volumen alto = señal más confiable</em>
+                        <strong>6. 💰 PRICE - Posición del Precio</strong>
+                        Precio > EMA rápida (posición alcista)
+                        <br><em>El precio debe estar por encima de la media móvil rápida</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>7. 🎯 Score de Confianza</strong>
-                        ¿El score general es lo suficientemente alto?
-                        <br><em>Mínimo 75/100 para señales por email</em>
+                        <strong>7. 🕯️ VELA - Momentum de Vela</strong>
+                        Vela positiva > 0.1% (momentum alcista)
+                        <br><em>La vela actual debe mostrar fuerza compradora</em>
                     </div>
 
                     <div class="criteria-item">
-                        <strong>8. ⏰ Timing del Mercado</strong>
-                        ¿Es un buen momento para operar?
-                        <br><em>Evita horarios de baja liquidez</em>
+                        <strong>8. ⚡ ACT - Actividad del Mercado</strong>
+                        Volumen > promedio (actividad suficiente)
+                        <br><em>Confirma que hay suficiente actividad para operar</em>
                     </div>
                 </div>
 
                 <div class="criteria-explanation">
-                    <h3>🎯 ¿Cuándo es bueno operar?</h3>
+                    <h3>🎯 ¿Cuándo aparecen las señales?</h3>
                     <div class="score-ranges">
                         <div class="score-range score-excellent">
-                            <div>🔥 8/8 criterios</div>
-                            <div>SEÑAL PERFECTA</div>
-                            <div>Probabilidad muy alta</div>
+                            <div>🔥 Progress ≥ 75%</div>
+                            <div>COMPRAR FUERTE</div>
+                            <div>Alta probabilidad + Email</div>
                         </div>
                         <div class="score-range score-good">
-                            <div>✅ 7/8 criterios</div>
-                            <div>SEÑAL EXCELENTE</div>
-                            <div>Probabilidad alta</div>
+                            <div>✅ Progress 50-74%</div>
+                            <div>COMPRAR DÉBIL</div>
+                            <div>Probabilidad media + Email</div>
                         </div>
                         <div class="score-range score-medium">
-                            <div>⚠️ 6/8 criterios</div>
-                            <div>SEÑAL BUENA</div>
-                            <div>Probabilidad media</div>
+                            <div>⚠️ Progress 25-49%</div>
+                            <div>ESPERAR</div>
+                            <div>Sin email - Solo observar</div>
                         </div>
                         <div class="score-range score-poor">
-                            <div>❌ <6/8 criterios</div>
-                            <div>NO OPERAR</div>
-                            <div>Probabilidad baja</div>
+                            <div>❌ Progress < 25%</div>
+                            <div>NO COMPRAR</div>
+                            <div>Condiciones desfavorables</div>
                         </div>
                     </div>
                 </div>

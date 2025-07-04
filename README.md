@@ -7,6 +7,9 @@
 
 A sophisticated cryptocurrency scalping bot that analyzes multiple trading pairs (BTC/ETH/SOL) using advanced technical indicators, sends professional HTML email alerts, and provides real-time market analysis with price targets.
 
+## Demo
+https://scalpingtrader.koyeb.app/
+
 ## ✨ Features
 
 ### 🎯 **Advanced Trading Strategy**

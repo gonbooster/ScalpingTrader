@@ -223,10 +223,10 @@ class MarketAnalyzer:
             "RSI_15m_bullish": rsi_15m > 50,
             "EMA_crossover": ema_fast > ema_slow,
             "Volume_high": volume > vol_avg * 1.2,
-            "Confidence_excellent": score >= 90,
+            "Confidence_good": score >= 75,
             "Price_above_EMA": price > ema_fast,
             "Candle_positive": candle_change > 0.1,
-            "Signal_distance": True  # Simplificado para dashboard
+            "Breakout_candle": volume > vol_avg * 1.2 and candle_change > 0.1  # Simplificado para dashboard
         }
 
         fulfilled = sum(1 for v in criteria.values() if v)
@@ -241,14 +241,14 @@ class MarketAnalyzer:
     def calculate_sell_criteria(self, price, rsi_1m, rsi_15m, ema_fast, ema_slow, volume, vol_avg, score, candle_change):
         """Calcula criterios de venta para visualización"""
         criteria = {
-            "RSI_1m_overbought": rsi_1m >= 70,
+            "RSI_1m_favorable": 30 <= rsi_1m <= 70,
             "RSI_15m_bearish": rsi_15m < 50,
             "EMA_crossunder": ema_fast < ema_slow,
             "Volume_high": volume > vol_avg * 1.2,
-            "Confidence_excellent": score >= 90,
+            "Confidence_good": score >= 75,
             "Price_below_EMA": price < ema_fast,
             "Candle_negative": candle_change < -0.1,
-            "Signal_distance": True  # Simplificado para dashboard
+            "Breakout_candle": volume > vol_avg * 1.2 and candle_change < -0.1  # Simplificado para dashboard
         }
 
         fulfilled = sum(1 for v in criteria.values() if v)

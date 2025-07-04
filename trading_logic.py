@@ -124,13 +124,20 @@ class TradingLogic:
             symbol, data["price"], "buy", data["score"]
         )
         
-        # Contar condiciones cumplidas
-        fulfilled = sum(1 for v in conditions.values() if v)
-        required = 6  # Mínimo 6 de 8 condiciones para emails (más flexible)
-        
-        logger.info(f"🔍 BUY {symbol}: {fulfilled}/{len(conditions)} condiciones cumplidas")
-        
-        return fulfilled >= required, conditions
+        # Contar condiciones cumplidas (excluyendo las de control)
+        core_conditions = {k: v for k, v in conditions.items()
+                          if k not in ["Breakout_candle", "Signal_distance"]}
+        core_fulfilled = sum(1 for v in core_conditions.values() if v)
+        total_fulfilled = sum(1 for v in conditions.values() if v)
+
+        # Requerimientos: 6 de 7 condiciones CORE + validaciones adicionales
+        required_core = 6
+        core_valid = core_fulfilled >= required_core
+        additional_valid = conditions.get("Breakout_candle", True) and conditions.get("Signal_distance", True)
+
+        logger.info(f"🔍 BUY {symbol}: {core_fulfilled}/7 core + {total_fulfilled-core_fulfilled}/2 extra = {total_fulfilled}/{len(conditions)} total")
+
+        return core_valid and additional_valid, conditions
     
     def check_sell_conditions(self, symbol, market_data, timeframe_data):
         """Verifica condiciones para señal de venta"""
@@ -158,13 +165,20 @@ class TradingLogic:
             symbol, data["price"], "sell", data["score"]
         )
         
-        # Contar condiciones cumplidas
-        fulfilled = sum(1 for v in conditions.values() if v)
-        required = 6  # Mínimo 6 de 8 condiciones para emails (más flexible)
-        
-        logger.info(f"🔍 SELL {symbol}: {fulfilled}/{len(conditions)} condiciones cumplidas")
-        
-        return fulfilled >= required, conditions
+        # Contar condiciones cumplidas (excluyendo las de control)
+        core_conditions = {k: v for k, v in conditions.items()
+                          if k not in ["Breakout_candle", "Signal_distance"]}
+        core_fulfilled = sum(1 for v in core_conditions.values() if v)
+        total_fulfilled = sum(1 for v in conditions.values() if v)
+
+        # Requerimientos: 6 de 7 condiciones CORE + validaciones adicionales
+        required_core = 6
+        core_valid = core_fulfilled >= required_core
+        additional_valid = conditions.get("Breakout_candle", True) and conditions.get("Signal_distance", True)
+
+        logger.info(f"🔍 SELL {symbol}: {core_fulfilled}/7 core + {total_fulfilled-core_fulfilled}/2 extra = {total_fulfilled}/{len(conditions)} total")
+
+        return core_valid and additional_valid, conditions
     
     def check_daily_email_limit(self):
         """Verifica si se ha alcanzado el límite diario de emails"""

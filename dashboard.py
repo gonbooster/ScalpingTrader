@@ -18,16 +18,76 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         icon = icons.get(name, '●')
         color = colors.get(name, '#64748b')
 
-        # 8 criterios REALES del backend (trading_logic.py)
+        # 8 criterios PRINCIPALES con indicadores de intensidad
+        # Nota: Breakout_candle y Signal_distance se evalúan internamente
 
-        c1 = "✓" if 30 <= rsi_1m <= 70 else "○"                             # RSI 1min favorable (30-70)
-        c2 = "✓" if rsi_15m > 50 else "○"                                    # RSI 15min alcista (>50)
-        c3 = "✓" if data.get('ema_fast', 0) > data.get('ema_slow', 0) else "○"  # EMA crossover
-        c4 = "✓" if vol_ratio > 1.2 else "○"                                 # Volumen alto (>1.2x)
-        c5 = "✓" if score >= 75 else "○"                                     # Confianza buena (>=75)
-        c6 = "✓" if price > data.get('ema_fast', 0) else "○"                 # Precio sobre EMA
-        c7 = "✓" if candle_change > 0.1 else "○"                            # Vela positiva (>0.1%)
-        c8 = "✓" if vol_ratio > 1.0 else "○"                                # Actividad del mercado
+        # RSI 1min con intensidad
+        if 40 <= rsi_1m <= 60:
+            c1, c1_intensity = "🟢", "ÓPTIMO"
+        elif 30 <= rsi_1m <= 70:
+            c1, c1_intensity = "✓", "BUENO"
+        else:
+            c1, c1_intensity = "○", "EXTREMO"
+
+        # RSI 15min con intensidad
+        if rsi_15m > 60:
+            c2, c2_intensity = "🟢", "FUERTE"
+        elif rsi_15m > 50:
+            c2, c2_intensity = "✓", "ALCISTA"
+        else:
+            c2, c2_intensity = "○", "BAJISTA"
+
+        # EMA con intensidad
+        ema_diff = ((data.get('ema_fast', 0) - data.get('ema_slow', 0)) / data.get('ema_slow', 1)) * 100 if data.get('ema_slow', 0) > 0 else 0
+        if ema_diff > 0.5:
+            c3, c3_intensity = "🟢", "FUERTE"
+        elif ema_diff > 0:
+            c3, c3_intensity = "✓", "ALCISTA"
+        else:
+            c3, c3_intensity = "○", "BAJISTA"
+
+        # Volumen con intensidad
+        if vol_ratio > 2.0:
+            c4, c4_intensity = "🟢", "EXPLOSIVO"
+        elif vol_ratio > 1.5:
+            c4, c4_intensity = "🟢", "ALTO"
+        elif vol_ratio > 1.2:
+            c4, c4_intensity = "✓", "ELEVADO"
+        else:
+            c4, c4_intensity = "○", "BAJO"
+
+        # Score con intensidad
+        if score >= 90:
+            c5, c5_intensity = "🟢", "EXCELENTE"
+        elif score >= 75:
+            c5, c5_intensity = "✓", "BUENO"
+        else:
+            c5, c5_intensity = "○", "DÉBIL"
+
+        # Precio vs EMA con intensidad
+        price_ema_diff = ((price - data.get('ema_fast', 0)) / data.get('ema_fast', 1)) * 100 if data.get('ema_fast', 0) > 0 else 0
+        if price_ema_diff > 1.0:
+            c6, c6_intensity = "🟢", "FUERTE"
+        elif price_ema_diff > 0:
+            c6, c6_intensity = "✓", "POSITIVO"
+        else:
+            c6, c6_intensity = "○", "NEGATIVO"
+
+        # Vela con intensidad
+        if candle_change > 0.5:
+            c7, c7_intensity = "🟢", "FUERTE"
+        elif candle_change > 0.1:
+            c7, c7_intensity = "✓", "POSITIVA"
+        else:
+            c7, c7_intensity = "○", "DÉBIL"
+
+        # Ruptura con intensidad
+        if vol_ratio > 1.5 and candle_change > 0.3:
+            c8, c8_intensity = "🟢", "EXPLOSIVA"
+        elif vol_ratio > 1.2 and candle_change > 0.1:
+            c8, c8_intensity = "✓", "BUENA"
+        else:
+            c8, c8_intensity = "○", "DÉBIL"
 
         count = [c1,c2,c3,c4,c5,c6,c7,c8].count("✓")
 
@@ -36,23 +96,37 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         bonus_points = max(0, score - 75) if score >= 75 else 0  # Bonus si score ≥ 75
         progress_percentage = min(100, base_percentage + bonus_points)  # Máximo 100%
 
-        # Señal clara basada en PROGRESS BAR FINAL
-        if progress_percentage >= 75:      # 75%+ = FUERTE
-            signal = "COMPRAR FUERTE"
+        # Sistema de badges mejorado con múltiples niveles
+        if progress_percentage >= 85:      # 85%+ = PREMIUM
+            signal = "🔥 PREMIUM"
+            signal_class = "signal-premium"
+            score_label = "EXCEPCIONAL"
+            confidence_level = "MÁXIMA"
+        elif progress_percentage >= 75:    # 75-84% = FUERTE
+            signal = "⭐ FUERTE"
             signal_class = "signal-strong"
             score_label = "EXCELENTE"
-        elif progress_percentage >= 50:   # 50-74% = DÉBIL
-            signal = "COMPRAR DÉBIL"
-            signal_class = "signal-weak"
+            confidence_level = "ALTA"
+        elif progress_percentage >= 60:    # 60-74% = BUENA
+            signal = "✅ BUENA"
+            signal_class = "signal-good"
             score_label = "BUENA"
-        elif progress_percentage >= 25:   # 25-49% = ESPERAR
-            signal = "ESPERAR"
-            signal_class = "signal-wait"
+            confidence_level = "MEDIA-ALTA"
+        elif progress_percentage >= 40:    # 40-59% = DÉBIL
+            signal = "⚠️ DÉBIL"
+            signal_class = "signal-weak"
             score_label = "REGULAR"
-        else:                              # 0-24% = NO COMPRAR
-            signal = "NO COMPRAR"
+            confidence_level = "MEDIA"
+        elif progress_percentage >= 25:    # 25-39% = ESPERAR
+            signal = "⏳ ESPERAR"
+            signal_class = "signal-wait"
+            score_label = "BAJA"
+            confidence_level = "BAJA"
+        else:                               # 0-24% = NO OPERAR
+            signal = "❌ NO OPERAR"
             signal_class = "signal-no"
-            score_label = "DÉBIL"
+            score_label = "MUY BAJA"
+            confidence_level = "MÍNIMA"
 
         # Datos de cambios de precio
         price_24h_change_percent = data.get('price_24h_change_percent', 0)
@@ -81,14 +155,14 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                     {change_now_icon} {price_change_percent:+.3f}% (${price_change_amount:+,.2f}) última act.
                 </div>
             </td>
-            <td class="criterion" title="RSI 1min: {rsi_1m:.1f} (30-70=✓)"><span class="signal-{c1.lower()}">{c1}</span></td>
-            <td class="criterion" title="RSI 15min: {rsi_15m:.1f} (>50=✓)"><span class="signal-{c2.lower()}">{c2}</span></td>
-            <td class="criterion" title="EMA: {data.get('ema_fast', 0):.1f} vs {data.get('ema_slow', 0):.1f}"><span class="signal-{c3.lower()}">{c3}</span></td>
-            <td class="criterion" title="Volumen: {vol_ratio:.1f}x (>1.2x=✓)"><span class="signal-{c4.lower()}">{c4}</span></td>
-            <td class="criterion" title="Score: {score}/100 (≥75=✓ +{bonus_points}pts bonus)"><span class="signal-{c5.lower()}">{c5}</span></td>
-            <td class="criterion" title="Precio: ${price:,.2f} vs EMA {data.get('ema_fast', 0):.1f}"><span class="signal-{c6.lower()}">{c6}</span></td>
-            <td class="criterion" title="Vela actual: {candle_change:.2f}% (>0.1%=✓)"><span class="signal-{c7.lower()}">{c7}</span></td>
-            <td class="criterion" title="Actividad: Vol {vol_ratio:.1f}x (>1.0x=✓)"><span class="signal-{c8.lower()}">{c8}</span></td>
+            <td class="criterion" title="RSI 1min: {rsi_1m:.1f} - {c1_intensity}"><span class="signal-{c1.lower().replace('🟢', 'excellent')}">{c1}</span></td>
+            <td class="criterion" title="RSI 15min: {rsi_15m:.1f} - {c2_intensity}"><span class="signal-{c2.lower().replace('🟢', 'excellent')}">{c2}</span></td>
+            <td class="criterion" title="EMA Tendencia: {ema_diff:+.2f}% - {c3_intensity}"><span class="signal-{c3.lower().replace('🟢', 'excellent')}">{c3}</span></td>
+            <td class="criterion" title="Volumen: {vol_ratio:.1f}x - {c4_intensity}"><span class="signal-{c4.lower().replace('🟢', 'excellent')}">{c4}</span></td>
+            <td class="criterion" title="Score: {score}/100 - {c5_intensity} (+{bonus_points}pts)"><span class="signal-{c5.lower().replace('🟢', 'excellent')}">{c5}</span></td>
+            <td class="criterion" title="Precio vs EMA: {price_ema_diff:+.2f}% - {c6_intensity}"><span class="signal-{c6.lower().replace('🟢', 'excellent')}">{c6}</span></td>
+            <td class="criterion" title="Vela: {candle_change:+.2f}% - {c7_intensity}"><span class="signal-{c7.lower().replace('🟢', 'excellent')}">{c7}</span></td>
+            <td class="criterion" title="Ruptura: {c8_intensity} (Vol:{vol_ratio:.1f}x + Vela:{candle_change:+.2f}%)"><span class="signal-{c8.lower().replace('🟢', 'excellent')}">{c8}</span></td>
             <td class="signal-cell">
                 <div class="trading-signal {signal_class}">{signal}</div>
                 <div class="reliability-bar">
@@ -197,11 +271,14 @@ body {{
 .price-change-now {{ font-size: 0.7rem; font-weight: 500; opacity: 0.9; }}
 .signal-✓ {{ color: #22c55e; font-weight: 700; }}
 .signal-○ {{ color: #64748b; }}
+.signal-excellent {{ color: #8b5cf6; font-weight: 800; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6); }}
 .score-value {{ font-weight: 600; }}
 .score-label {{ font-size: 0.7rem; color: #94a3b8; }}
 .score-count {{ font-size: 0.65rem; color: #64748b; margin-top: 2px; }}
 .signal-explanation {{ font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }}
+.signal-premium {{ color: #8b5cf6; font-weight: 800; text-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }}
 .signal-strong {{ color: #22c55e; font-weight: 700; }}
+.signal-good {{ color: #3b82f6; font-weight: 600; }}
 .signal-weak {{ color: #f59e0b; font-weight: 600; }}
 .signal-wait {{ color: #64748b; }}
 .signal-no {{ color: #ef4444; }}
@@ -212,7 +289,9 @@ body {{
 .reliability-fill {{
     height: 100%; border-radius: 8px; transition: width 0.3s ease;
 }}
+.reliability-fill.signal-premium {{ background: linear-gradient(90deg, #8b5cf6, #7c3aed); box-shadow: 0 0 15px rgba(139, 92, 246, 0.4); }}
 .reliability-fill.signal-strong {{ background: linear-gradient(90deg, #22c55e, #16a34a); }}
+.reliability-fill.signal-good {{ background: linear-gradient(90deg, #3b82f6, #2563eb); }}
 .reliability-fill.signal-weak {{ background: linear-gradient(90deg, #f59e0b, #d97706); }}
 .reliability-fill.signal-wait {{ background: linear-gradient(90deg, #64748b, #475569); }}
 .reliability-fill.signal-no {{ background: linear-gradient(90deg, #ef4444, #dc2626); }}
@@ -268,7 +347,7 @@ body {{
 <thead>
 <tr>
     <th>CRYPTO</th><th>PRECIO</th>
-    <th colspan="8" class="buy-header">🟢 CRITERIOS DE COMPRA (8)</th>
+    <th colspan="8" class="buy-header">🟢 CRITERIOS DE COMPRA</th>
     <th>SEÑAL</th>
 </tr>
 <tr>
@@ -276,7 +355,7 @@ body {{
     <th title="RSI 1min entre 30-70 (zona favorable)">RSI1</th><th title="RSI 15min mayor a 50 (tendencia alcista)">RSI15</th>
     <th title="EMA rápida por encima de EMA lenta (tendencia)">EMA</th><th title="Volumen mayor a 1.2x del promedio (interés)">VOL</th>
     <th title="Score confianza ≥ 75 (da bonus al progress bar)">CONF</th><th title="Precio por encima de EMA rápida (posición)">PRICE</th>
-    <th title="Vela actual positiva mayor a 0.1% (momentum)">VELA</th><th title="Volumen mayor a promedio (actividad)">ACT</th>
+    <th title="Vela actual positiva mayor a 0.1% (momentum)">VELA</th><th title="Ruptura: Volumen alto + vela fuerte">RUPT</th>
     <th></th>
 </tr>
 </thead>
