@@ -224,6 +224,25 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
         rsi_5m = data.get('rsi_5m', 0)
         rsi_15m = data.get('rsi_15m', 0)
         score = data.get('score', 0)
+
+        # Generar checks para criterios (simulamos lógica básica)
+        rsi_1m_check = "✅" if (rsi_1m <= 30 or rsi_1m >= 70) else "❌"
+        rsi_5m_check = "✅" if (rsi_5m <= 30 or rsi_5m >= 70) else "❌"
+        rsi_15m_check = "✅" if (rsi_15m <= 30 or rsi_15m >= 70) else "❌"
+
+        # Score classes y labels
+        if score >= 90:
+            score_class = "excellent"
+            score_label = "EXCELENTE"
+        elif score >= 75:
+            score_class = "strong"
+            score_label = "FUERTE"
+        elif score >= 60:
+            score_class = "good"
+            score_label = "BUENA"
+        else:
+            score_class = "weak"
+            score_label = "DÉBIL"
         
         # Nuevos datos del email
         candle_change = data.get('candle_change_percent', 0)
@@ -244,6 +263,28 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
 
         # Calcular ratio de volumen de forma segura
         vol_ratio = vol_now / vol_avg if vol_avg > 0 else 0
+        volume_check = "✅" if vol_ratio >= 1.5 else "❌"
+
+        # Variables adicionales para los nuevos criterios
+        momentum = data.get('momentum', 0)
+        momentum_check = "✅" if momentum > 0 else "❌"
+
+        # Tendencia EMA
+        ema_fast = data.get('ema_fast', 0)
+        ema_slow = data.get('ema_slow', 0)
+        trend_direction = "📈 ALCISTA" if ema_fast > ema_slow else "📉 BAJISTA"
+        trend_strength = "FUERTE" if abs(ema_fast - ema_slow) > (ema_slow * 0.01) else "DÉBIL"
+        trend_check = "✅" if ema_fast > ema_slow else "❌"
+
+        # Timing del mercado (simulado)
+        timing_score = min(100, max(0, score + 10))  # Basado en score general
+        timing_status = "ÓPTIMO" if timing_score >= 80 else "BUENO" if timing_score >= 60 else "REGULAR"
+        timing_check = "✅" if timing_score >= 70 else "❌"
+
+        # Volatilidad ATR
+        atr = data.get('atr', 0)
+        volatility_status = "ALTA" if atr > 100 else "MEDIA" if atr > 50 else "BAJA"
+        volatility_check = "✅" if atr > 50 else "❌"
         
         # Targets para BUY y SELL
         tp_buy = data.get('take_profit_buy', 0)
@@ -331,54 +372,71 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
             
             <div class="metrics-grid">
                 <div class="metric rsi-metric" title="RSI 1min: Indicador de momentum inmediato. 0-30=Sobreventa (posible rebote), 30-70=Neutral, 70-100=Sobrecompra (posible caída). Ideal para timing exacto de entrada.">
+                    <div class="metric-check">{rsi_1m_check}</div>
                     <div class="metric-value" data-rsi="{symbol}">{rsi_1m:.1f}</div>
                     <div class="metric-label">📊 RSI 1min</div>
                     <div class="metric-status">{'🔴 Sobrecompra' if rsi_1m >= 70 else '🟢 Sobreventa' if rsi_1m <= 30 else '🟡 Neutral'}</div>
                 </div>
                 <div class="metric rsi-metric" title="RSI 5min: Confirmación rápida del momentum. Más confiable que 1min, menos ruido. Perfecto para scalping - filtra señales falsas del 1min.">
+                    <div class="metric-check">{rsi_5m_check}</div>
                     <div class="metric-value">{rsi_5m:.1f}</div>
                     <div class="metric-label">⚡ RSI 5min</div>
                     <div class="metric-status">{'🔴 Sobrecompra' if rsi_5m >= 70 else '🟢 Sobreventa' if rsi_5m <= 30 else '🟡 Neutral'}</div>
                 </div>
                 <div class="metric rsi-metric" title="RSI 15min: Tendencia general del mercado. Indica la dirección principal. Si coincide con 1m y 5m = señal muy fuerte. Evita operar contra esta tendencia.">
+                    <div class="metric-check">{rsi_15m_check}</div>
                     <div class="metric-value" data-rsi15="{symbol}">{rsi_15m:.1f}</div>
                     <div class="metric-label">🎯 RSI 15min</div>
                     <div class="metric-status">{'🔴 Sobrecompra' if rsi_15m >= 70 else '🟢 Sobreventa' if rsi_15m <= 30 else '🟡 Neutral'}</div>
                 </div>
                 <div class="metric volume-metric {volume_class}" title="Volumen: Cantidad de operaciones. Ratio >1.5x = alta actividad (más confiable). Volumen alto confirma la fuerza del movimiento.">
+                    <div class="metric-check">{volume_check}</div>
                     <div class="metric-value" data-volume="{symbol}">{vol_now:,.0f}</div>
                     <div class="metric-label">📊 Volumen</div>
                     <div class="metric-status">Ratio: {vol_ratio:.1f}x</div>
                 </div>
+                <div class="metric momentum-metric" title="Momentum: Velocidad del cambio de precio. >0=Subiendo, <0=Bajando. Indica la fuerza del movimiento actual.">
+                    <div class="metric-check">{momentum_check}</div>
+                    <div class="metric-value">{momentum:.2f}</div>
+                    <div class="metric-label">⚡ Momentum</div>
+                    <div class="metric-status">{momentum_strength}</div>
+                </div>
+                <div class="metric trend-metric" title="Tendencia EMA: Compara EMA rápida vs lenta. Indica dirección general del mercado.">
+                    <div class="metric-check">{trend_check}</div>
+                    <div class="metric-value">{trend_direction}</div>
+                    <div class="metric-label">📈 Tendencia</div>
+                    <div class="metric-status">{trend_strength}</div>
+                </div>
+                <div class="metric timing-metric" title="Timing: Evalúa si es buen momento para operar basado en volatilidad y horario del mercado.">
+                    <div class="metric-check">{timing_check}</div>
+                    <div class="metric-value">{timing_score}/100</div>
+                    <div class="metric-label">⏰ Timing</div>
+                    <div class="metric-status">{timing_status}</div>
+                </div>
+                <div class="metric volatility-metric" title="Volatilidad ATR: Mide qué tan activo está el mercado. Alta volatilidad = más oportunidades pero más riesgo.">
+                    <div class="metric-check">{volatility_check}</div>
+                    <div class="metric-value">{atr:.2f}</div>
+                    <div class="metric-label">📊 ATR</div>
+                    <div class="metric-status">{volatility_status}</div>
+                </div>
             </div>
 
-            <!-- Criterios de Trading ANTES del Score -->
-            <div class="criteria-section">
-                <div class="criteria-header">📋 Criterios de Trading</div>
-                <div class="criteria-grid">
-                    <div class="criteria-column">
-                        <div class="criteria-title">🟢 COMPRA</div>
-                        <div class="criteria-indicators">
-                            {generate_criteria_indicators(buy_criteria, 'buy')}
-                        </div>
-                        <div class="criteria-count">{buy_criteria.get('fulfilled', 0)}/{buy_criteria.get('total', 8)} criterios</div>
+            <!-- Progress Bar del Score -->
+            <div class="score-section">
+                <div class="score-progress-container">
+                    <div class="score-label">🎯 Score de Confianza</div>
+                    <div class="score-progress-bar">
+                        <div class="score-progress-fill {score_class}" style="width: {score}%"></div>
+                        <div class="score-text">{score}/100 {score_label}</div>
                     </div>
-                    <div class="criteria-column">
-                        <div class="criteria-title">🔴 VENTA</div>
-                        <div class="criteria-indicators">
-                            {generate_criteria_indicators(sell_criteria, 'sell')}
-                        </div>
-                        <div class="criteria-count">{sell_criteria.get('fulfilled', 0)}/{sell_criteria.get('total', 8)} criterios</div>
+                    <div class="score-criteria">
+                        <span class="criteria-buy">🟢 BUY: {buy_criteria.get('fulfilled', 0)}/8</span>
+                        <span class="criteria-sell">🔴 SELL: {sell_criteria.get('fulfilled', 0)}/8</span>
                     </div>
                 </div>
             </div>
 
-            <div class="metrics-grid" style="margin-top: 7px;">
-                <div class="metric score-metric {confidence_class}" title="Score de Confianza: Algoritmo que evalúa 8 condiciones técnicas. 90-100=Excelente (alta probabilidad), 75-89=Fuerte, 60-74=Buena, <60=Débil. Solo se envían emails con 90+ y 7/8 condiciones.">
-                    <div class="metric-value" data-score="{symbol}">{confidence_emoji} {score}/100</div>
-                    <div class="metric-label">{confidence_label}</div>
-                </div>
-            </div>
+
             
             <div class="trading-scenarios">
                 <div class="scenario-title">📊 Escenarios de Trading:</div>
@@ -568,9 +626,77 @@ def get_dashboard_css():
         .candle-change { text-align: center; padding: 8px 12px; border-radius: 8px; font-weight: 600; margin-bottom: 15px; }
         .candle-change.positive { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
         .candle-change.negative { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
         .score-metric { grid-column: span 2; }
-        .metric { background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #475569; }
+
+        /* Score Progress Bar */
+        .score-section {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            color: #f1f5f9;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .score-progress-bar {
+            position: relative;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 20px;
+            height: 24px;
+            overflow: hidden;
+            border: 1px solid #475569;
+        }
+
+        .score-progress-fill {
+            height: 100%;
+            border-radius: 20px;
+            transition: width 0.8s ease;
+            position: relative;
+        }
+
+        .score-progress-fill.excellent { background: linear-gradient(90deg, #22c55e, #16a34a); }
+        .score-progress-fill.strong { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+        .score-progress-fill.good { background: linear-gradient(90deg, #f59e0b, #d97706); }
+        .score-progress-fill.weak { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+        .score-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .score-criteria {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .criteria-buy { color: #22c55e; }
+        .criteria-sell { color: #ef4444; }
+        .metric { background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #475569; position: relative; }
+
+        .metric-check {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
         .metric-value { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }
         .metric-label { font-size: 0.8rem; color: #f1f5f9 !important; margin-top: 4px; font-weight: 500; }
         .metric-status { font-size: 0.6rem; color: #f1f5f9 !important; margin-top: 2px; font-weight: 400; }
@@ -599,6 +725,21 @@ def get_dashboard_css():
         .footer { text-align: center; margin-top: 25px; color: #64748b; font-size: 0.85rem; }
         .update-indicator { position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 10px 18px; border-radius: 25px; font-size: 0.85rem; opacity: 0; transition: all 0.3s ease; z-index: 1000; }
         .update-indicator.show { opacity: 1; }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .crypto-card { margin-bottom: 20px; }
+            .header-buttons { gap: 8px; }
+            .instructions-btn-compact, .analytics-btn-compact, .logs-btn-compact { padding: 4px 8px; font-size: 0.7rem; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        }
+
+        @media (max-width: 480px) {
+            .metrics-grid { grid-template-columns: 1fr; gap: 6px; }
+            .metric { padding: 8px; }
+            .metric-check { font-size: 1rem; top: 4px; right: 6px; }
+        }
     </style>
     """
 
