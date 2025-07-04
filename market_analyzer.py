@@ -2,7 +2,7 @@
 import numpy as np
 import logging
 from datetime import datetime, timezone
-from binance_api import get_multi_timeframe_data, extract_prices
+from binance_api import get_multi_timeframe_data, extract_prices, binance_api
 from indicators import (
     calculate_ema, calculate_rsi, calculate_atr, calculate_adx,
     calculate_volume_sma, calculate_confidence_score, calculate_price_targets
@@ -15,6 +15,7 @@ class MarketAnalyzer:
         self.symbols = symbols or ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
         self.market_data = self._initialize_market_data()
         self.using_simulation = False
+        self.binance_api = binance_api  # Referencia a la instancia de BinanceAPI
     
     def _initialize_market_data(self):
         """Inicializa estructura de datos del mercado"""
@@ -28,7 +29,10 @@ class MarketAnalyzer:
                 "candle_change_percent": 0.0, "take_profit_buy": 0.0,
                 "stop_loss_buy": 0.0, "expected_move_buy": 0.0, "risk_reward_buy": 0.0,
                 "take_profit_sell": 0.0, "stop_loss_sell": 0.0,
-                "expected_move_sell": 0.0, "risk_reward_sell": 0.0
+                "expected_move_sell": 0.0, "risk_reward_sell": 0.0,
+                # Nuevos campos para cambios de precio
+                "price_24h_change_percent": 0.0, "price_24h_change_amount": 0.0,
+                "previous_price": 0.0, "price_change_percent": 0.0, "price_change_amount": 0.0
             }
         return data
     
@@ -89,6 +93,16 @@ class MarketAnalyzer:
             
             close_now = prices_1m["current_price"]
             vol_now = prices_1m["current_volume"]
+
+            # Obtener datos de 24h para cambios de precio
+            symbol_info = self.binance_api.get_symbol_info(symbol)
+            price_24h_change_percent = float(symbol_info.get('priceChangePercent', 0)) if symbol_info else 0
+            price_24h_change_amount = float(symbol_info.get('priceChange', 0)) if symbol_info else 0
+
+            # Calcular cambio desde última actualización
+            previous_price = self.market_data[symbol].get("price", close_now)
+            price_change_amount = close_now - previous_price
+            price_change_percent = ((close_now - previous_price) / previous_price * 100) if previous_price > 0 else 0
             
             # Parámetros adaptativos
             pair_type = self.detect_pair_type(symbol)
@@ -147,6 +161,7 @@ class MarketAnalyzer:
 
             # Actualizar datos del mercado
             self.market_data[symbol].update({
+                "previous_price": previous_price,
                 "price": close_now,
                 "rsi": rsi_1m,
                 "rsi_1m": rsi_1m,
@@ -160,6 +175,10 @@ class MarketAnalyzer:
                 "confidence_score": confidence_score,
                 "atr": atr_val,
                 "candle_change_percent": candle_change_percent,
+                "price_24h_change_percent": price_24h_change_percent,
+                "price_24h_change_amount": price_24h_change_amount,
+                "price_change_percent": price_change_percent,
+                "price_change_amount": price_change_amount,
                 "take_profit_buy": price_targets_buy["take_profit"],
                 "stop_loss_buy": price_targets_buy["stop_loss"],
                 "expected_move_buy": price_targets_buy["expected_move_percent"],
