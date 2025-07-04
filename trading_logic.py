@@ -19,7 +19,7 @@ class TradingLogic:
     def __init__(self):
         self.last_signals = {}
         self.signal_count = 0
-        self.cooldown_time = 1800  # 30 minutos entre señales del mismo par
+        self.cooldown_time = 300   # 5 minutos entre señales del mismo par (para testing)
         self.daily_email_count = 0
         self.last_email_date = None
         self.max_daily_emails = 10  # Máximo 10 emails por día
@@ -108,7 +108,7 @@ class TradingLogic:
             "RSI_15m_bullish": data["rsi_15m"] > 50,
             "EMA_crossover": data["ema_fast"] > data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_excellent": data["score"] >= 90,  # Solo señales EXCELENTES por email
+            "Confidence_good": data["score"] >= 75,  # Señales BUENAS o mejores por email
             "Price_above_EMA": data["price"] > data["ema_fast"],
             "Candle_positive": data["candle_change_percent"] > 0.1
         }
@@ -126,7 +126,7 @@ class TradingLogic:
         
         # Contar condiciones cumplidas
         fulfilled = sum(1 for v in conditions.values() if v)
-        required = 7  # Mínimo 7 de 8 condiciones para emails
+        required = 6  # Mínimo 6 de 8 condiciones para emails (más flexible)
         
         logger.info(f"🔍 BUY {symbol}: {fulfilled}/{len(conditions)} condiciones cumplidas")
         
@@ -142,7 +142,7 @@ class TradingLogic:
             "RSI_15m_bearish": data["rsi_15m"] < 50,
             "EMA_crossunder": data["ema_fast"] < data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_excellent": data["score"] >= 90,  # Solo señales EXCELENTES por email
+            "Confidence_good": data["score"] >= 75,  # Señales BUENAS o mejores por email
             "Price_below_EMA": data["price"] < data["ema_fast"],
             "Candle_negative": data["candle_change_percent"] < -0.1
         }
@@ -160,7 +160,7 @@ class TradingLogic:
         
         # Contar condiciones cumplidas
         fulfilled = sum(1 for v in conditions.values() if v)
-        required = 7  # Mínimo 7 de 8 condiciones para emails
+        required = 6  # Mínimo 6 de 8 condiciones para emails (más flexible)
         
         logger.info(f"🔍 SELL {symbol}: {fulfilled}/{len(conditions)} condiciones cumplidas")
         
@@ -315,7 +315,7 @@ class TradingLogic:
                 'expected_move': price_targets.get('expected_move'),
                 'risk_reward': price_targets.get('risk_reward'),
                 'market_conditions': {
-                    'conditions': conditions,
+                    'conditions': {k: bool(v) for k, v in conditions.items()},  # Convertir a bool explícitamente
                     'timeframe_data': 'multi_tf_analysis'
                 }
             }

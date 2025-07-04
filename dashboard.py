@@ -1,5 +1,6 @@
 # dashboard.py - Frontend y dashboard web
 from datetime import datetime
+from version_info import get_version_badge
 
 def get_24h_price_change(symbol, current_price):
     """Obtiene el cambio de precio en 24h desde Binance"""
@@ -140,6 +141,7 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 <h1>🎯 Scalping Dashboard</h1>
                 <p>BTC • ETH • SOL • Análisis en tiempo real</p>
                 <div class="header-buttons">
+                    <a href="/instructions" class="instructions-btn-compact" target="_blank">📚 Guía</a>
                     <a href="/analytics" class="analytics-btn-compact" target="_blank">📊 Analytics</a>
                     <a href="/logs" class="logs-btn-compact" target="_blank">📋 Logs</a>
                 </div>
@@ -178,6 +180,9 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         <div class="update-indicator" id="updateIndicator">
             ✅ Datos actualizados
         </div>
+
+        <!-- Badge de versión automático -->
+        {get_version_badge()}
     </body>
     </html>
     """
@@ -441,6 +446,21 @@ def get_dashboard_css():
         .header p { color: #94a3b8; font-size: 1rem; margin-bottom: 15px; }
         .header-buttons {
             display: flex; justify-content: center; gap: 10px; margin-top: 10px;
+        }
+        .instructions-btn-compact {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white; text-decoration: none;
+            padding: 6px 12px; border-radius: 6px;
+            font-weight: 600; font-size: 0.8rem; transition: all 0.3s ease;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            box-shadow: 0 2px 8px rgba(34, 197, 94, 0.2);
+            display: inline-block; opacity: 0.8;
+        }
+        .instructions-btn-compact:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+            text-decoration: none; color: white;
+            opacity: 1;
         }
         .analytics-btn-compact {
             background: linear-gradient(135deg, #6366f1, #8b5cf6);

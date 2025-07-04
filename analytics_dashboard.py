@@ -2,6 +2,7 @@
 from flask import jsonify
 import sqlite3
 from datetime import datetime, timedelta
+from version_info import get_version_badge
 import json
 
 def generate_analytics_dashboard(performance_stats, recent_signals, market_trends):
@@ -63,14 +64,26 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             .score-stats {{ display: flex; gap: 20px; font-size: 0.9rem; }}
             
             .signals-table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
-            .signals-table th, .signals-table td {{ 
+            .signals-table th, .signals-table td {{
                 padding: 12px; text-align: left; border-bottom: 1px solid #334155;
             }}
-            .signals-table th {{ 
+            .signals-table th {{
                 background: rgba(15, 23, 42, 0.8); color: #94a3b8; font-weight: 600;
                 text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;
             }}
             .signals-table tr:hover {{ background: rgba(15, 23, 42, 0.4); }}
+
+            /* Responsive table */
+            .table-container {{ overflow-x: auto; }}
+            @media (max-width: 768px) {{
+                .signals-table {{ font-size: 0.8rem; }}
+                .signals-table th, .signals-table td {{ padding: 8px 4px; }}
+                .signals-table th:nth-child(n+6), .signals-table td:nth-child(n+6) {{ display: none; }}
+            }}
+            @media (max-width: 480px) {{
+                .signals-table th:nth-child(n+4), .signals-table td:nth-child(n+4) {{ display: none; }}
+                .signals-table th, .signals-table td {{ padding: 6px 2px; font-size: 0.7rem; }}
+            }}
             
             .status-win {{ color: #22c55e; font-weight: 600; }}
             .status-loss {{ color: #ef4444; font-weight: 600; }}
@@ -202,7 +215,8 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             
             <div class="chart-card">
                 <div class="chart-title">📋 Señales Recientes</div>
-                <table class="signals-table">
+                <div class="table-container">
+                    <table class="signals-table">
                     <thead>
                         <tr>
                             <th>Timestamp</th>
@@ -218,7 +232,8 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     <tbody>
                         {generate_signals_table(recent_signals)}
                     </tbody>
-                </table>
+                    </table>
+                </div>
             </div>
         </div>
         
@@ -233,6 +248,9 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 // Actualizar solo el último elemento que es el timestamp
             }}, 1000);
         </script>
+
+        <!-- Badge de versión automático -->
+        {get_version_badge()}
     </body>
     </html>
     """

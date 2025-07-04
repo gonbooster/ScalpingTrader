@@ -10,6 +10,8 @@ from log_manager import get_logger, get_logs_html_response, get_logs_json_respon
 from market_analyzer import analyze_market, get_market_data
 from trading_logic import analyze_trading_signals, get_trading_stats
 from dashboard import generate_dashboard_html
+from analytics_dashboard import generate_analytics_dashboard
+from instructions_dashboard import generate_instructions_dashboard
 from email_service import initialize_email_service, test_email_connection
 from config import validate_config, SYMBOLS, PORT
 
@@ -280,6 +282,24 @@ def bot_status():
         "email_configured": validate_config(),
         "timestamp": datetime.now().isoformat()
     })
+
+@app.route('/instructions')
+def instructions():
+    """Dashboard educativo de instrucciones"""
+    try:
+        return generate_instructions_dashboard()
+    except Exception as e:
+        logger.error(f"❌ Error generando dashboard de instrucciones: {e}")
+        return f"""
+        <html>
+        <head><title>Error - Instrucciones</title></head>
+        <body style="background: #0f172a; color: #e2e8f0; font-family: Arial; padding: 40px; text-align: center;">
+            <h1>❌ Error cargando instrucciones</h1>
+            <p>Error: {e}</p>
+            <a href="/" style="color: #60a5fa;">← Volver al Dashboard</a>
+        </body>
+        </html>
+        """, 500
 
 @app.route('/analytics')
 def analytics():
