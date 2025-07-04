@@ -100,33 +100,21 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         if progress_percentage >= 85:      # 85%+ = PREMIUM
             signal = "🔥 PREMIUM"
             signal_class = "signal-premium"
-            score_label = "EXCEPCIONAL"
-            confidence_level = "MÁXIMA"
         elif progress_percentage >= 75:    # 75-84% = FUERTE
             signal = "⭐ FUERTE"
             signal_class = "signal-strong"
-            score_label = "EXCELENTE"
-            confidence_level = "ALTA"
         elif progress_percentage >= 60:    # 60-74% = BUENA
             signal = "✅ BUENA"
             signal_class = "signal-good"
-            score_label = "BUENA"
-            confidence_level = "MEDIA-ALTA"
         elif progress_percentage >= 40:    # 40-59% = DÉBIL
             signal = "⚠️ DÉBIL"
             signal_class = "signal-weak"
-            score_label = "REGULAR"
-            confidence_level = "MEDIA"
         elif progress_percentage >= 25:    # 25-39% = ESPERAR
             signal = "⏳ ESPERAR"
             signal_class = "signal-wait"
-            score_label = "BAJA"
-            confidence_level = "BAJA"
         else:                               # 0-24% = NO OPERAR
             signal = "❌ NO OPERAR"
             signal_class = "signal-no"
-            score_label = "MUY BAJA"
-            confidence_level = "MÍNIMA"
 
         # Datos de cambios de precio
         price_24h_change_percent = data.get('price_24h_change_percent', 0)
@@ -169,7 +157,6 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                     <div class="reliability-fill {signal_class}" style="width: {progress_percentage:.1f}%"></div>
                     <span class="reliability-text">{progress_percentage:.1f}% ({count}/8{'+' + str(bonus_points) + 'pts' if bonus_points > 0 else ''})</span>
                 </div>
-                <div class="reliability-label">{score_label}</div>
             </td>
         </tr>"""
 
@@ -299,7 +286,6 @@ body {{
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     font-size: 0.7rem; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }}
-.reliability-label {{ font-size: 0.7rem; color: #94a3b8; text-align: center; }}
 .trading-table th[title]:hover::after,
 .trading-table td[title]:hover::after {{
     content: attr(title); position: fixed; background: rgba(0,0,0,0.9);
@@ -332,7 +318,7 @@ body {{
             </div>
             <nav class="header-nav">
                 <a href="/" class="nav-link active">📊 Dashboard</a>
-                <a href="/logs" class="nav-link">📡 Logs</a>
+                <a href="/analytics" class="nav-link">📈 Análisis</a>
                 <a href="/instructions" class="nav-link">📚 Instrucciones</a>
             </nav>
         </div>

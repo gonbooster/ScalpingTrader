@@ -146,11 +146,11 @@ class PerformanceTracker:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Obtener señales pendientes de las últimas 48 horas
+        # Obtener TODAS las señales pendientes (sin límite de tiempo para verificación más agresiva)
         cursor.execute('''
             SELECT * FROM signals
             WHERE status = 'PENDING'
-            AND datetime(timestamp) > datetime('now', '-48 hours')
+            ORDER BY timestamp DESC
         ''')
 
         pending_signals = cursor.fetchall()
@@ -165,49 +165,43 @@ class PerformanceTracker:
             sl_price = signal[16]
             entry_time = datetime.fromisoformat(signal[1])
 
-            # Verificar si la señal es muy antigua (más de 24h sin resolverse)
+            # Verificar tiempo transcurrido
             hours_elapsed = (datetime.now() - entry_time).total_seconds() / 3600
-            if hours_elapsed > 24:
-                # Marcar como expirada
-                current_price = self.get_current_price(symbol)
-                if current_price:
-                    actual_return = self.calculate_return(signal_type, entry_price, current_price)
-                    cursor.execute('''
-                        UPDATE signals SET
-                        status = 'EXPIRED',
-                        result = 'EXPIRED',
-                        exit_price = ?,
-                        exit_timestamp = ?,
-                        actual_return = ?,
-                        time_to_resolution = ?,
-                        notes = 'Señal expirada sin alcanzar TP/SL en 24h'
-                        WHERE id = ?
-                    ''', (
-                        current_price, datetime.now().isoformat(),
-                        actual_return, int(hours_elapsed * 60), signal_id
-                    ))
-                    updated_count += 1
-                    logger.info(f"⏰ Señal {signal_id} expirada: {actual_return:+.2f}%")
-                continue
+            minutes_elapsed = int(hours_elapsed * 60)
 
             # Obtener precio actual
             current_price = self.get_current_price(symbol)
             if not current_price:
                 continue
 
-            # Verificar si se alcanzó TP o SL
-            result = self.check_tp_sl_hit(
-                signal_type, entry_price, current_price, tp_price, sl_price
-            )
+            # Lógica de evaluación más agresiva y realista
+            result = None
+            actual_return = self.calculate_return(signal_type, entry_price, current_price)
 
+            # Verificar TP/SL primero
+            tp_sl_result = self.check_tp_sl_hit(signal_type, entry_price, current_price, tp_price, sl_price)
+
+            if tp_sl_result:
+                result = tp_sl_result
+            elif hours_elapsed >= 2:  # Evaluar después de 2 horas
+                # Lógica basada en movimiento de precio
+                if signal_type.upper() == 'BUY':
+                    if actual_return >= 1.5:  # +1.5% = WIN
+                        result = 'WIN_TIME'
+                    elif actual_return <= -1.0:  # -1% = LOSS
+                        result = 'LOSS_TIME'
+                    elif hours_elapsed >= 8:  # 8 horas = EXPIRED
+                        result = 'EXPIRED'
+                elif signal_type.upper() == 'SELL':
+                    if actual_return >= 1.5:  # Precio bajó 1.5% = WIN
+                        result = 'WIN_TIME'
+                    elif actual_return <= -1.0:  # Precio subió 1% = LOSS
+                        result = 'LOSS_TIME'
+                    elif hours_elapsed >= 8:  # 8 horas = EXPIRED
+                        result = 'EXPIRED'
+
+            # Si hay resultado, actualizar
             if result:
-                # Actualizar resultado
-                exit_time = datetime.now()
-                time_to_resolution = int((exit_time - entry_time).total_seconds() / 60)
-                actual_return = self.calculate_return(
-                    signal_type, entry_price, current_price
-                )
-
                 cursor.execute('''
                     UPDATE signals SET
                     status = 'COMPLETED',
@@ -215,16 +209,21 @@ class PerformanceTracker:
                     exit_price = ?,
                     exit_timestamp = ?,
                     actual_return = ?,
-                    time_to_resolution = ?
+                    time_to_resolution = ?,
+                    notes = ?
                     WHERE id = ?
                 ''', (
-                    result, current_price, exit_time.isoformat(),
-                    actual_return, time_to_resolution, signal_id
+                    result, current_price, datetime.now().isoformat(),
+                    actual_return, minutes_elapsed,
+                    f'Evaluado por {"TP/SL" if tp_sl_result else "tiempo"} después de {hours_elapsed:.1f}h',
+                    signal_id
                 ))
-
                 updated_count += 1
-                win_emoji = "🎯" if "WIN" in result else "❌"
-                logger.info(f"📊 {win_emoji} Señal {signal_id} completada: {result} ({actual_return:+.2f}%)")
+                win_emoji = "🎯" if "WIN" in result else "❌" if "LOSS" in result else "⏰"
+                logger.info(f"📊 {win_emoji} {symbol} {signal_type}: {result} ({actual_return:+.2f}%) en {hours_elapsed:.1f}h")
+                continue
+
+
 
         conn.commit()
         conn.close()
@@ -233,6 +232,85 @@ class PerformanceTracker:
             logger.info(f"📊 Actualizadas {updated_count} señales")
 
         return updated_count
+
+    def force_evaluate_all_pending(self):
+        """Fuerza la evaluación de TODAS las señales pendientes inmediatamente"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            # Obtener todas las señales pendientes
+            cursor.execute('SELECT * FROM signals WHERE status = "PENDING"')
+            pending_signals = cursor.fetchall()
+
+            logger.info(f"🔍 Evaluando {len(pending_signals)} señales pendientes...")
+
+            updated_count = 0
+            for signal in pending_signals:
+                signal_id = signal[0]
+                symbol = signal[2]
+                signal_type = signal[3]
+                entry_price = signal[4]
+                entry_time = datetime.fromisoformat(signal[1])
+
+                # Obtener precio actual
+                current_price = self.get_current_price(symbol)
+                if not current_price:
+                    continue
+
+                # Calcular tiempo transcurrido
+                hours_elapsed = (datetime.now() - entry_time).total_seconds() / 3600
+                minutes_elapsed = int(hours_elapsed * 60)
+
+                # Calcular retorno actual
+                actual_return = self.calculate_return(signal_type, entry_price, current_price)
+
+                # Determinar resultado basado en el movimiento de precio
+                result = None
+                if signal_type.upper() == 'BUY':
+                    if actual_return >= 1.0:  # +1% = WIN
+                        result = 'WIN_TIME'
+                    elif actual_return <= -0.5:  # -0.5% = LOSS
+                        result = 'LOSS_TIME'
+                    else:
+                        result = 'EXPIRED'  # Neutral = EXPIRED
+                elif signal_type.upper() == 'SELL':
+                    if actual_return >= 1.0:  # Precio bajó 1% = WIN
+                        result = 'WIN_TIME'
+                    elif actual_return <= -0.5:  # Precio subió 0.5% = LOSS
+                        result = 'LOSS_TIME'
+                    else:
+                        result = 'EXPIRED'  # Neutral = EXPIRED
+
+                # Actualizar señal
+                cursor.execute('''
+                    UPDATE signals SET
+                    status = 'COMPLETED',
+                    result = ?,
+                    exit_price = ?,
+                    exit_timestamp = ?,
+                    actual_return = ?,
+                    time_to_resolution = ?,
+                    notes = 'Evaluación forzada para análisis'
+                    WHERE id = ?
+                ''', (
+                    result, current_price, datetime.now().isoformat(),
+                    actual_return, minutes_elapsed, signal_id
+                ))
+
+                updated_count += 1
+                win_emoji = "🎯" if "WIN" in result else "❌" if "LOSS" in result else "⏰"
+                logger.info(f"📊 {win_emoji} {symbol} {signal_type}: {result} ({actual_return:+.2f}%)")
+
+            conn.commit()
+            conn.close()
+
+            logger.info(f"✅ Evaluación forzada completada: {updated_count} señales actualizadas")
+            return updated_count
+
+        except Exception as e:
+            logger.error(f"❌ Error en evaluación forzada: {e}")
+            return 0
 
     def calculate_streaks(self, streak_data):
         """Calcula rachas ganadoras y perdedoras"""
@@ -409,28 +487,28 @@ class PerformanceTracker:
         pending_count = cursor.fetchone()[0]
         logger.info(f"📊 Señales pendientes: {pending_count}")
 
-        # Estadísticas básicas
+        # Estadísticas básicas (INCLUIR TODAS las señales, no solo completadas)
         cursor.execute('''
             SELECT
                 COUNT(*) as total_signals,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN 1 ELSE 0 END) as losses,
                 SUM(CASE WHEN result = 'EXPIRED' THEN 1 ELSE 0 END) as expired,
-                AVG(actual_return) as avg_return,
+                SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+                AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
                 AVG(score) as avg_score,
-                AVG(time_to_resolution) as avg_time_minutes,
+                AVG(CASE WHEN time_to_resolution IS NOT NULL THEN time_to_resolution END) as avg_time_minutes,
                 MAX(actual_return) as best_return,
                 MIN(actual_return) as worst_return,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN actual_return ELSE 0 END) as total_profit,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN actual_return ELSE 0 END) as total_loss
             FROM signals
-            WHERE status IN ('COMPLETED', 'EXPIRED')
-            AND datetime(timestamp) > datetime('now', '-{} days')
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
         '''.format(days))
 
         basic_stats = cursor.fetchone()
 
-        # Estadísticas por score
+        # Estadísticas por score (INCLUIR TODAS las señales)
         cursor.execute('''
             SELECT
                 CASE
@@ -441,61 +519,61 @@ class PerformanceTracker:
                 END as score_range,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
-                AVG(actual_return) as avg_return,
+                AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
                 MAX(actual_return) as best_return,
                 MIN(actual_return) as worst_return
             FROM signals
-            WHERE status IN ('COMPLETED', 'EXPIRED')
-            AND datetime(timestamp) > datetime('now', '-{} days')
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
             GROUP BY score_range
             ORDER BY MIN(score) DESC
         '''.format(days))
 
         score_stats = cursor.fetchall()
 
-        # Estadísticas por símbolo
+        # Estadísticas por símbolo (INCLUIR TODAS las señales)
         cursor.execute('''
             SELECT
                 symbol,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
-                AVG(actual_return) as avg_return,
+                AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
                 AVG(score) as avg_score
             FROM signals
-            WHERE status IN ('COMPLETED', 'EXPIRED')
-            AND datetime(timestamp) > datetime('now', '-{} days')
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
             GROUP BY symbol
             ORDER BY count DESC
         '''.format(days))
 
         symbol_stats = cursor.fetchall()
 
-        # Estadísticas por horario
+        # Estadísticas por horario (INCLUIR TODAS las señales)
         cursor.execute('''
             SELECT
                 strftime('%H', timestamp) as hour,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
-                AVG(actual_return) as avg_return
+                AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
+                AVG(score) as avg_score
             FROM signals
-            WHERE status IN ('COMPLETED', 'EXPIRED')
-            AND datetime(timestamp) > datetime('now', '-{} days')
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
             GROUP BY hour
+            HAVING count >= 2
             ORDER BY count DESC
         '''.format(days))
 
         hourly_stats = cursor.fetchall()
 
-        # Análisis de volatilidad por símbolo
+        # Análisis de volatilidad por símbolo (usar ATR como proxy)
         cursor.execute('''
             SELECT
                 symbol,
-                AVG(ABS(actual_return)) as avg_volatility,
-                MAX(ABS(actual_return)) as max_volatility,
+                AVG(atr) as avg_atr,
+                MAX(atr) as max_atr,
+                AVG(ABS(candle_change)) as avg_candle_volatility,
                 COUNT(*) as count
             FROM signals
-            WHERE status IN ('COMPLETED', 'EXPIRED')
-            AND datetime(timestamp) > datetime('now', '-{} days')
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
+            AND atr IS NOT NULL
             GROUP BY symbol
         '''.format(days))
 
@@ -522,7 +600,8 @@ class PerformanceTracker:
         wins = basic_stats[1] or 0
         losses = basic_stats[2] or 0
         expired = basic_stats[3] or 0
-        win_rate = (wins / total_signals * 100) if total_signals > 0 else 0
+        pending = basic_stats[4] or 0
+        win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
 
         # Si no hay datos, mostrar mensaje informativo
         if total_signals == 0:
@@ -533,16 +612,16 @@ class PerformanceTracker:
             'wins': wins,
             'losses': losses,
             'expired': expired,
-            'pending': 0,  # Se calculará en tiempo real
+            'pending': pending,
             'win_rate': win_rate,
-            'avg_return': basic_stats[4] or 0,
-            'avg_score': basic_stats[5] or 0,
-            'avg_time_minutes': basic_stats[6] or 0,
-            'best_return': basic_stats[7] or 0,
-            'worst_return': basic_stats[8] or 0,
-            'total_profit': basic_stats[9] or 0,
-            'total_loss': basic_stats[10] or 0,
-            'net_profit': (basic_stats[9] or 0) + (basic_stats[10] or 0),
+            'avg_return': basic_stats[5] or 0,
+            'avg_score': basic_stats[6] or 0,
+            'avg_time_minutes': basic_stats[7] or 0,
+            'best_return': basic_stats[8] or 0,
+            'worst_return': basic_stats[9] or 0,
+            'total_profit': basic_stats[10] or 0,
+            'total_loss': basic_stats[11] or 0,
+            'net_profit': (basic_stats[10] or 0) + (basic_stats[11] or 0),
             'score_breakdown': [
                 {
                     'range': row[0],
@@ -568,20 +647,33 @@ class PerformanceTracker:
             ],
             'hourly_breakdown': [
                 {
-                    'hour': f"{row[0]}:00",
+                    'hour': f"{int(row[0]):02d}:00",
                     'count': row[1],
                     'wins': row[2],
                     'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
-                    'avg_return': row[3] or 0
+                    'avg_return': row[3] or 0,
+                    'avg_score': row[4] or 0
                 }
                 for row in hourly_stats
             ],
-            'volatility_analysis': [
+            'hourly_breakdown': [
+                {
+                    'hour': f"{int(row[0]):02d}:00",
+                    'count': row[1],
+                    'wins': row[2],
+                    'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
+                    'avg_return': row[3] or 0,
+                    'avg_score': row[4] or 0
+                }
+                for row in hourly_stats
+            ],
+            'volatility_breakdown': [
                 {
                     'symbol': row[0],
-                    'avg_volatility': row[1] or 0,
-                    'max_volatility': row[2] or 0,
-                    'count': row[3]
+                    'avg_atr': row[1] or 0,
+                    'max_atr': row[2] or 0,
+                    'avg_candle_volatility': row[3] or 0,
+                    'count': row[4]
                 }
                 for row in volatility_stats
             ],

@@ -27,6 +27,19 @@ def generate_instructions_dashboard():
                 margin: 0 auto;
                 padding: 20px;
             }}
+
+            /* Header Navigation */
+            .header-nav {{
+                display: flex; justify-content: center; gap: 20px; margin-bottom: 30px;
+                padding: 15px; background: rgba(30, 41, 59, 0.8); border-radius: 15px;
+            }}
+            .nav-link {{
+                color: #94a3b8; text-decoration: none; padding: 10px 20px;
+                border-radius: 8px; font-weight: 500; transition: all 0.3s ease;
+                border: 1px solid transparent;
+            }}
+            .nav-link:hover {{ background: rgba(148, 163, 184, 0.1); color: #f1f5f9; border-color: rgba(148, 163, 184, 0.3); }}
+            .nav-link.active {{ background: rgba(34, 197, 94, 0.2); color: #22c55e; border-color: rgba(34, 197, 94, 0.3); }}
             
             .header {{
                 text-align: center;
@@ -280,9 +293,13 @@ def generate_instructions_dashboard():
         </style>
     </head>
     <body>
-
-        
         <div class="container">
+            <nav class="header-nav">
+                <a href="/" class="nav-link">📊 Dashboard</a>
+                <a href="/analytics" class="nav-link">📈 Análisis</a>
+                <a href="/instructions" class="nav-link active">📚 Instrucciones</a>
+            </nav>
+
             <div class="header">
                 <h1>📚 Guía Completa de Trading</h1>
                 <p>Aprende a interpretar todos los indicadores y señales del ScalpingTrader</p>

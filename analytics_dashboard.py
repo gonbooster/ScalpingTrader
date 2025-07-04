@@ -2,16 +2,23 @@
 from flask import jsonify
 import sqlite3
 from datetime import datetime, timedelta
-from version_info import get_version_badge
+
 import json
+
+def safe_float(value, default=0):
+    """Convierte un valor a float de forma segura"""
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
 
 def generate_analytics_dashboard(performance_stats, recent_signals, market_trends):
     """Genera el dashboard de análisis de rendimiento"""
     
-    # Calcular métricas adicionales
+    # Calcular métricas adicionales con validación
     total_signals = performance_stats.get('total_signals', 0)
-    win_rate = performance_stats.get('win_rate', 0)
-    avg_return = performance_stats.get('avg_return', 0)
+    win_rate = safe_float(performance_stats.get('win_rate', 0))
+    avg_return = safe_float(performance_stats.get('avg_return', 0))
     
     return f"""
     <!DOCTYPE html>
@@ -28,6 +35,20 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 color: #f1f5f9; min-height: 100vh; padding: 20px;
             }}
             .container {{ max-width: 1400px; margin: 0 auto; }}
+
+            /* Header Navigation */
+            .header-nav {{
+                display: flex; justify-content: center; gap: 20px; margin-bottom: 30px;
+                padding: 15px; background: rgba(30, 41, 59, 0.8); border-radius: 15px;
+            }}
+            .nav-link {{
+                color: #94a3b8; text-decoration: none; padding: 10px 20px;
+                border-radius: 8px; font-weight: 500; transition: all 0.3s ease;
+                border: 1px solid transparent;
+            }}
+            .nav-link:hover {{ background: rgba(148, 163, 184, 0.1); color: #f1f5f9; border-color: rgba(148, 163, 184, 0.3); }}
+            .nav-link.active {{ background: rgba(59, 130, 246, 0.2); color: #3b82f6; border-color: rgba(59, 130, 246, 0.3); }}
+
             .header {{ text-align: center; margin-bottom: 30px; }}
             .header h1 {{ font-size: 2.5rem; margin-bottom: 10px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }}
             .header p {{ color: #94a3b8; font-size: 1.1rem; }}
@@ -110,10 +131,17 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
     </head>
     <body>
         <div class="container">
+            <nav class="header-nav">
+                <a href="/" class="nav-link">📊 Dashboard</a>
+                <a href="/analytics" class="nav-link active">📈 Análisis</a>
+                <a href="/instructions" class="nav-link">📚 Instrucciones</a>
+            </nav>
+
             <div class="header">
                 <h1>📊 Trading Performance Analytics</h1>
                 <p>Sistema de análisis de rendimiento y optimización de señales</p>
                 <button class="refresh-btn" onclick="location.reload()">🔄 Actualizar Datos</button>
+                <button class="refresh-btn" onclick="forceEvaluate()" style="background: #f59e0b; margin-left: 10px;">⚡ Evaluar Señales</button>
             </div>
             
             <div class="warning">
@@ -124,7 +152,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="stat-card">
                     <div class="stat-value win-rate">{total_signals}</div>
                     <div class="stat-label">Total Señales</div>
-                    <div class="stat-trend">✅ {performance_stats.get('wins', 0)} wins • ❌ {performance_stats.get('losses', 0)} losses • ⏰ {performance_stats.get('expired', 0)} expired</div>
+                    <div class="stat-trend">✅ {performance_stats.get('wins', 0)} wins • ❌ {performance_stats.get('losses', 0)} losses • ⏰ {performance_stats.get('expired', 0)} expired • 🔄 {performance_stats.get('pending', 0)} pending</div>
                 </div>
 
                 <div class="stat-card">
@@ -136,19 +164,19 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="stat-card">
                     <div class="stat-value {'win-rate' if avg_return > 0 else 'loss-rate'}">{avg_return:+.2f}%</div>
                     <div class="stat-label">Retorno Promedio</div>
-                    <div class="stat-trend">💰 Mejor: {performance_stats.get('best_return', 0):+.2f}% • 📉 Peor: {performance_stats.get('worst_return', 0):+.2f}%</div>
+                    <div class="stat-trend">💰 Mejor: {safe_float(performance_stats.get('best_return', 0)):+.2f}% • 📉 Peor: {safe_float(performance_stats.get('worst_return', 0)):+.2f}%</div>
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-value {'win-rate' if performance_stats.get('net_profit', 0) > 0 else 'loss-rate'}">{performance_stats.get('net_profit', 0):+.2f}%</div>
+                    <div class="stat-value {'win-rate' if safe_float(performance_stats.get('net_profit', 0)) > 0 else 'loss-rate'}">{safe_float(performance_stats.get('net_profit', 0)):+.2f}%</div>
                     <div class="stat-label">Profit Neto</div>
-                    <div class="stat-trend">📈 Total: {performance_stats.get('total_profit', 0):+.2f}% • 📉 Pérdidas: {performance_stats.get('total_loss', 0):+.2f}%</div>
+                    <div class="stat-trend">📈 Total: {safe_float(performance_stats.get('total_profit', 0)):+.2f}% • 📉 Pérdidas: {safe_float(performance_stats.get('total_loss', 0)):+.2f}%</div>
                 </div>
 
                 <div class="stat-card">
-                    <div class="stat-value neutral">{performance_stats.get('avg_score', 0):.0f}/100</div>
+                    <div class="stat-value neutral">{safe_float(performance_stats.get('avg_score', 0)):.0f}/100</div>
                     <div class="stat-label">Score Promedio</div>
-                    <div class="stat-trend">⏱️ Tiempo medio: {performance_stats.get('avg_time_minutes', 0):.0f} min</div>
+                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min</div>
                 </div>
             </div>
             
@@ -179,7 +207,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="chart-card">
                     <div class="chart-title">📊 Análisis de Volatilidad</div>
                     <div class="score-breakdown">
-                        {generate_volatility_breakdown(performance_stats.get('volatility_analysis', []))}
+                        {generate_volatility_breakdown(performance_stats.get('volatility_breakdown', []))}
                     </div>
                 </div>
             </div>
@@ -239,18 +267,48 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
         
         <script>
             // Auto-refresh cada 5 minutos
-            setTimeout(() => location.reload(), 300000);
-            
+            setTimeout(function() {{ location.reload(); }}, 300000);
+
             // Actualizar timestamp cada segundo
-            setInterval(() => {{
-                const now = new Date();
-                const timeElements = document.querySelectorAll('.stat-trend');
+            setInterval(function() {{
+                var now = new Date();
+                var timeElements = document.querySelectorAll('.stat-trend');
                 // Actualizar solo el último elemento que es el timestamp
             }}, 1000);
+
+            async function forceEvaluate() {{
+                const btn = event.target;
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Evaluando...';
+
+                try {{
+                    const response = await fetch('/force-evaluate', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }}
+                    }});
+
+                    const result = await response.json();
+
+                    if (result.success) {{
+                        btn.innerHTML = '✅ Completado';
+                        alert('✅ Evaluación completada: ' + result.updated_count + ' señales actualizadas');
+                        setTimeout(function() {{ location.reload(); }}, 1000);
+                    }} else {{
+                        btn.innerHTML = '❌ Error';
+                        alert('❌ Error: ' + result.error);
+                    }}
+                }} catch (error) {{
+                    btn.innerHTML = '❌ Error';
+                    alert('❌ Error de conexión: ' + error.message);
+                }}
+
+                setTimeout(function() {{
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ Evaluar Señales';
+                }}, 3000);
+            }}
         </script>
 
-        <!-- Badge de versión automático -->
-        {get_version_badge()}
     </body>
     </html>
     """
@@ -262,17 +320,17 @@ def generate_score_breakdown(score_breakdown):
 
     html = ""
     for item in score_breakdown:
-        win_rate = item.get('win_rate', 0)
+        win_rate = safe_float(item.get('win_rate', 0))
         color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
 
         html += f"""
         <div class="score-item">
-            <span class="score-range">{item['range']}</span>
+            <span class="score-range">{item.get('range', 'N/A')}</span>
             <div class="score-stats">
                 <span class="{color_class}">{win_rate:.1f}% WR</span>
-                <span>{item['count']} señales</span>
-                <span>{item.get('avg_return', 0):+.2f}%</span>
-                <span>📈 {item.get('best_return', 0):+.1f}%</span>
+                <span>{item.get('count', 0)} señales</span>
+                <span>{safe_float(item.get('avg_return', 0)):+.2f}%</span>
+                <span>📈 {safe_float(item.get('best_return', 0)):+.1f}%</span>
             </div>
         </div>
         """
@@ -285,20 +343,20 @@ def generate_symbol_breakdown(symbol_breakdown):
 
     html = ""
     for item in symbol_breakdown:
-        win_rate = item.get('win_rate', 0)
+        win_rate = safe_float(item.get('win_rate', 0))
         color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
 
         # Emoji por símbolo
-        emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item['symbol'], "💰")
+        emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item.get('symbol', ''), "💰")
 
         html += f"""
         <div class="score-item">
-            <span class="score-range">{emoji} {item['symbol']}</span>
+            <span class="score-range">{emoji} {item.get('symbol', 'N/A')}</span>
             <div class="score-stats">
                 <span class="{color_class}">{win_rate:.1f}% WR</span>
-                <span>{item['count']} señales</span>
-                <span>{item.get('avg_return', 0):+.2f}%</span>
-                <span>📊 {item.get('avg_score', 0):.0f}/100</span>
+                <span>{item.get('count', 0)} señales</span>
+                <span>{safe_float(item.get('avg_return', 0)):+.2f}%</span>
+                <span>📊 {safe_float(item.get('avg_score', 0)):.0f}/100</span>
             </div>
         </div>
         """
@@ -314,16 +372,16 @@ def generate_hourly_breakdown(hourly_breakdown):
 
     html = ""
     for item in sorted_hours:
-        win_rate = item.get('win_rate', 0)
+        win_rate = safe_float(item.get('win_rate', 0))
         color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
 
         html += f"""
         <div class="score-item">
-            <span class="score-range">🕐 {item['hour']}</span>
+            <span class="score-range">🕐 {item.get('hour', 'N/A')}</span>
             <div class="score-stats">
                 <span class="{color_class}">{win_rate:.1f}% WR</span>
-                <span>{item['count']} señales</span>
-                <span>{item.get('avg_return', 0):+.2f}%</span>
+                <span>{item.get('count', 0)} señales</span>
+                <span>{safe_float(item.get('avg_return', 0)):+.2f}%</span>
             </div>
         </div>
         """
@@ -348,10 +406,10 @@ def generate_signals_table(recent_signals):
             <td>{signal.get('symbol', '')}</td>
             <td>{signal.get('signal_type', '').upper()}</td>
             <td>{signal.get('score', 0)}/100</td>
-            <td>${signal.get('entry_price', 0):,.2f}</td>
-            <td class="{status_class}">{signal.get('result', 'PENDING')}</td>
-            <td>{signal.get('actual_return', 0):+.2f}%</td>
-            <td>{signal.get('time_to_resolution', 0)} min</td>
+            <td>${safe_float(signal.get('entry_price', 0)):,.2f}</td>
+            <td class="{status_class}">{signal.get('result', 'None')}</td>
+            <td>{safe_float(signal.get('actual_return', 0)):+.2f}%</td>
+            <td>{int(safe_float(signal.get('time_to_resolution', 0)))} min</td>
         </tr>
         """
     return html
@@ -377,16 +435,23 @@ def get_analytics_data():
     recent_signals = []
     
     for signal in signals_raw:
+        # Función auxiliar para convertir a float de forma segura
+        def safe_float(value, default=0):
+            try:
+                return float(value) if value is not None else default
+            except (ValueError, TypeError):
+                return default
+
         recent_signals.append({
             'id': signal[0],
             'timestamp': signal[1],
             'symbol': signal[2],
             'signal_type': signal[3],
-            'entry_price': signal[4],
-            'score': signal[5],
-            'result': signal[18],
-            'actual_return': signal[21] or 0,
-            'time_to_resolution': signal[22] or 0,
+            'entry_price': safe_float(signal[4]),
+            'score': safe_float(signal[5]),
+            'result': signal[18] if signal[18] is not None else 'None',
+            'actual_return': safe_float(signal[21]),
+            'time_to_resolution': safe_float(signal[22]),
             'today': signal[1][:10] == datetime.now().strftime('%Y-%m-%d')
         })
     
@@ -405,16 +470,16 @@ def generate_volatility_breakdown(volatility_analysis):
     html = ""
     for item in volatility_analysis:
         emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item['symbol'], "💰")
-        volatility_level = "🔥 Alta" if item['avg_volatility'] > 3 else "⚡ Media" if item['avg_volatility'] > 1.5 else "📊 Baja"
+        volatility_level = "🔥 Alta" if item.get('avg_atr', 0) > 100 else "⚡ Media" if item.get('avg_atr', 0) > 50 else "📊 Baja"
 
         html += f"""
         <div class="score-item">
             <span class="score-range">{emoji} {item['symbol']}</span>
             <div class="score-stats">
                 <span>{volatility_level}</span>
-                <span>Promedio: {item['avg_volatility']:.2f}%</span>
-                <span>Máximo: {item['max_volatility']:.2f}%</span>
-                <span>{item['count']} señales</span>
+                <span>ATR: {safe_float(item.get('avg_atr', 0)):.1f}</span>
+                <span>Velas: {safe_float(item.get('avg_candle_volatility', 0)):.2f}%</span>
+                <span>{item.get('count', 0)} señales</span>
             </div>
         </div>
         """

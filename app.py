@@ -57,14 +57,12 @@ def trading_loop():
     
     logger.info("🚀 INICIANDO LOOP DE TRADING")
 
-    # Primer análisis inmediato
-    logger.info("⚡ Ejecutando primer análisis...")
+    # Primer análisis inmediato (solo datos, sin señales para evitar duplicados)
+    logger.info("⚡ Ejecutando primer análisis de datos...")
     try:
         if analyze_market():
             last_analysis_time = datetime.now()
-            market_data = get_market_data()
-            analyze_trading_signals(market_data, last_signals)
-            logger.info("✅ Primer análisis completado")
+            logger.info("✅ Primer análisis de datos completado")
     except Exception as e:
         logger.error(f"❌ Error en primer análisis: {e}")
 
@@ -370,6 +368,24 @@ def init_trading_bot():
         import time
         time.sleep(2)
         logger.info("⏰ Thread de trading inicializado")
+
+@app.route('/force-evaluate', methods=['POST'])
+def force_evaluate():
+    """Endpoint para forzar evaluación de señales pendientes"""
+    try:
+        from performance_tracker import PerformanceTracker
+        tracker = PerformanceTracker()
+        updated = tracker.force_evaluate_all_pending()
+        return jsonify({
+            'success': True,
+            'message': f'Evaluadas {updated} señales',
+            'updated_count': updated
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 # Inicializar bot automáticamente
 init_trading_bot()

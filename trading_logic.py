@@ -124,61 +124,56 @@ class TradingLogic:
             symbol, data["price"], "buy", data["score"]
         )
         
-        # Contar condiciones cumplidas (excluyendo las de control)
-        core_conditions = {k: v for k, v in conditions.items()
-                          if k not in ["Breakout_candle", "Signal_distance"]}
-        core_fulfilled = sum(1 for v in core_conditions.values() if v)
-        total_fulfilled = sum(1 for v in conditions.values() if v)
+        # Simplificar: usar EXACTAMENTE los 8 criterios del dashboard
+        # Excluir solo Signal_distance (control interno)
+        main_conditions = {k: v for k, v in conditions.items() if k != "Signal_distance"}
+        main_fulfilled = sum(1 for v in main_conditions.values() if v)
+        signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos: 6 de 7 condiciones CORE + validaciones adicionales
-        required_core = 6
-        core_valid = core_fulfilled >= required_core
-        additional_valid = conditions.get("Breakout_candle", True) and conditions.get("Signal_distance", True)
+        # Requerimientos BUY: 5 de 8 condiciones principales + distancia OK
+        required_main = 5
+        main_valid = main_fulfilled >= required_main
 
-        logger.info(f"🔍 BUY {symbol}: {core_fulfilled}/7 core + {total_fulfilled-core_fulfilled}/2 extra = {total_fulfilled}/{len(conditions)} total")
+        logger.info(f"🔍 BUY {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
+        if main_fulfilled < required_main:
+            logger.info(f"   ❌ Faltan {required_main - main_fulfilled} criterios para BUY (necesita {required_main}/8)")
+        if not signal_distance_ok:
+            logger.info(f"   ❌ Distancia de señal no válida (cooldown activo)")
 
-        return core_valid and additional_valid, conditions
+        return main_valid and signal_distance_ok, conditions
     
     def check_sell_conditions(self, symbol, market_data, timeframe_data):
         """Verifica condiciones para señal de venta"""
         data = market_data[symbol]
         
-        # Condiciones básicas
+        # 8 condiciones SELL (opuestas a BUY)
         conditions = {
-            "RSI_1m_favorable": 30 <= data["rsi_1m"] <= 70,
-            "RSI_15m_bearish": data["rsi_15m"] < 50,
-            "EMA_crossunder": data["ema_fast"] < data["ema_slow"],
-            "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_good": data["score"] >= 75,  # Señales BUENAS o mejores por email
-            "Price_below_EMA": data["price"] < data["ema_fast"],
-            "Candle_negative": data["candle_change_percent"] < -0.1
+            "RSI_1m_favorable": 30 <= data["rsi_1m"] <= 70,  # Mismo que BUY
+            "RSI_15m_bearish": data["rsi_15m"] < 50,          # Opuesto a BUY
+            "EMA_crossunder": data["ema_fast"] < data["ema_slow"],  # Opuesto a BUY
+            "Volume_high": data["volume"] > data["vol_avg"] * 1.2,  # Mismo que BUY
+            "Confidence_good": data["score"] >= 75,           # Mismo que BUY
+            "Price_below_EMA": data["price"] < data["ema_fast"],    # Opuesto a BUY
+            "Candle_negative": data["candle_change_percent"] < -0.1,  # Opuesto a BUY
+            "Breakout_candle": data["volume"] > data["vol_avg"] * 1.2 and data["candle_change_percent"] < -0.1  # Ruptura bajista
         }
-        
-        # Validar vela de ruptura si hay datos
-        if timeframe_data and "1m" in timeframe_data:
-            conditions["Breakout_candle"] = self.validate_breakout_candle(
-                timeframe_data["1m"], "sell"
-            )
-        
-        # Verificar distancia de señales (con score para cooldown inteligente)
-        conditions["Signal_distance"] = self.check_signal_distance(
-            symbol, data["price"], "sell", data["score"]
-        )
-        
-        # Contar condiciones cumplidas (excluyendo las de control)
-        core_conditions = {k: v for k, v in conditions.items()
-                          if k not in ["Breakout_candle", "Signal_distance"]}
-        core_fulfilled = sum(1 for v in core_conditions.values() if v)
-        total_fulfilled = sum(1 for v in conditions.values() if v)
 
-        # Requerimientos: 6 de 7 condiciones CORE + validaciones adicionales
-        required_core = 6
-        core_valid = core_fulfilled >= required_core
-        additional_valid = conditions.get("Breakout_candle", True) and conditions.get("Signal_distance", True)
+        # Verificar distancia de señales (control interno)
+        conditions["Signal_distance"] = self.check_signal_distance(symbol, data["price"], "sell", data["score"])
+        
+        # Simplificar: usar EXACTAMENTE los 8 criterios del dashboard
+        # Excluir solo Signal_distance (control interno)
+        main_conditions = {k: v for k, v in conditions.items() if k != "Signal_distance"}
+        main_fulfilled = sum(1 for v in main_conditions.values() if v)
+        signal_distance_ok = conditions.get("Signal_distance", True)
 
-        logger.info(f"🔍 SELL {symbol}: {core_fulfilled}/7 core + {total_fulfilled-core_fulfilled}/2 extra = {total_fulfilled}/{len(conditions)} total")
+        # Requerimientos SELL: 6 de 8 condiciones principales + distancia OK (más estricto)
+        required_main = 6
+        main_valid = main_fulfilled >= required_main
 
-        return core_valid and additional_valid, conditions
+        logger.info(f"🔍 SELL {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
+
+        return main_valid and signal_distance_ok, conditions
     
     def check_daily_email_limit(self):
         """Verifica si se ha alcanzado el límite diario de emails"""
@@ -210,6 +205,7 @@ class TradingLogic:
             price_targets = calculate_price_targets(
                 data["price"], data["atr"], signal_type, symbol
             )
+            logger.info(f"🎯 Price targets para {symbol}: {price_targets}")
             
             # Enviar email solo si send_email=True
             if send_email:
@@ -269,7 +265,8 @@ class TradingLogic:
         else:
             self.cycle_count = 1
 
-        if self.cycle_count % 10 == 0 and TRACKING_ENABLED:
+        # Verificar señales cada 3 ciclos (más frecuente) para resultados más rápidos
+        if self.cycle_count % 3 == 0 and TRACKING_ENABLED:
             try:
                 updated = performance_tracker.check_signal_outcomes()
                 if updated > 0:
@@ -324,10 +321,10 @@ class TradingLogic:
                 'volume_ratio': data.get('volume', 0) / data.get('vol_avg', 1) if data.get('vol_avg') else 0,
                 'atr': data.get('atr'),
                 'candle_change': data.get('candle_change_percent'),
-                'tp_price': price_targets.get('tp'),
-                'sl_price': price_targets.get('sl'),
-                'expected_move': price_targets.get('expected_move'),
-                'risk_reward': price_targets.get('risk_reward'),
+                'tp_price': price_targets.get('take_profit') if price_targets else None,
+                'sl_price': price_targets.get('stop_loss') if price_targets else None,
+                'expected_move': price_targets.get('expected_move_percent') if price_targets else None,
+                'risk_reward': price_targets.get('risk_reward_ratio') if price_targets else None,
                 'market_conditions': {
                     'conditions': {k: bool(v) for k, v in conditions.items()},  # Convertir a bool explícitamente
                     'timeframe_data': 'multi_tf_analysis'
