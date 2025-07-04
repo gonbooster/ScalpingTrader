@@ -280,7 +280,7 @@ def generate_instructions_dashboard():
         </style>
     </head>
     <body>
-        <a href="/" class="back-btn">← Volver al Dashboard</a>
+
         
         <div class="container">
             <div class="header">
@@ -674,11 +674,7 @@ def generate_instructions_dashboard():
                     análisis técnico, pero recuerda que <strong>ningún sistema es 100% preciso</strong>.
                 </p>
 
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="/" class="nav-btn" style="font-size: 1.1rem; padding: 15px 30px;">
-                        🏠 Volver al Dashboard Principal
-                    </a>
-                </div>
+
             </div>
         </div>
 

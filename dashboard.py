@@ -1,6 +1,6 @@
 # dashboard.py - Frontend y dashboard web
 from datetime import datetime
-from version_info import get_version_badge
+from version_info import get_version_string
 
 def get_24h_price_change(symbol, current_price):
     """Obtiene el cambio de precio en 24h desde Binance"""
@@ -181,8 +181,10 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
             ✅ Datos actualizados
         </div>
 
-        <!-- Badge de versión automático -->
-        {get_version_badge()}
+        <!-- Versión fija en footer -->
+        <div class="version-footer">
+            {get_version_string()}
+        </div>
     </body>
     </html>
     """
@@ -225,10 +227,19 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
         rsi_15m = data.get('rsi_15m', 0)
         score = data.get('score', 0)
 
-        # Generar checks para criterios (simulamos lógica básica)
-        rsi_1m_check = "✅" if (rsi_1m <= 30 or rsi_1m >= 70) else "❌"
-        rsi_5m_check = "✅" if (rsi_5m <= 30 or rsi_5m >= 70) else "❌"
-        rsi_15m_check = "✅" if (rsi_15m <= 30 or rsi_15m >= 70) else "❌"
+        # Generar checks para criterios BUY/SELL específicos
+        # BUY: RSI < 30 (sobrevendido), SELL: RSI > 70 (sobrecomprado)
+        rsi_1m_buy = "🟢" if rsi_1m <= 30 else "❌"
+        rsi_1m_sell = "🔴" if rsi_1m >= 70 else "❌"
+        rsi_1m_check = f"{rsi_1m_buy}BUY {rsi_1m_sell}SELL"
+
+        rsi_5m_buy = "🟢" if rsi_5m <= 30 else "❌"
+        rsi_5m_sell = "🔴" if rsi_5m >= 70 else "❌"
+        rsi_5m_check = f"{rsi_5m_buy}BUY {rsi_5m_sell}SELL"
+
+        rsi_15m_buy = "🟢" if rsi_15m <= 30 else "❌"
+        rsi_15m_sell = "🔴" if rsi_15m >= 70 else "❌"
+        rsi_15m_check = f"{rsi_15m_buy}BUY {rsi_15m_sell}SELL"
 
         # Score classes y labels
         if score >= 90:
@@ -263,28 +274,44 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
 
         # Calcular ratio de volumen de forma segura
         vol_ratio = vol_now / vol_avg if vol_avg > 0 else 0
-        volume_check = "✅" if vol_ratio >= 1.5 else "❌"
+        # Volumen alto es bueno tanto para BUY como SELL
+        volume_buy = "🟢" if vol_ratio >= 1.5 else "❌"
+        volume_sell = "🔴" if vol_ratio >= 1.5 else "❌"
+        volume_check = f"{volume_buy}BUY {volume_sell}SELL"
 
         # Variables adicionales para los nuevos criterios
         momentum = data.get('momentum', 0)
-        momentum_check = "✅" if momentum > 0 else "❌"
+        momentum_strength = "🔥 FUERTE" if abs(momentum) >= 0.5 else "⚡ MEDIO" if abs(momentum) >= 0.2 else "📊 DÉBIL"
+        # BUY: momentum > 0, SELL: momentum < 0
+        momentum_buy = "�" if momentum > 0 else "❌"
+        momentum_sell = "🔴" if momentum < 0 else "❌"
+        momentum_check = f"{momentum_buy}BUY {momentum_sell}SELL"
 
         # Tendencia EMA
         ema_fast = data.get('ema_fast', 0)
         ema_slow = data.get('ema_slow', 0)
         trend_direction = "📈 ALCISTA" if ema_fast > ema_slow else "📉 BAJISTA"
         trend_strength = "FUERTE" if abs(ema_fast - ema_slow) > (ema_slow * 0.01) else "DÉBIL"
-        trend_check = "✅" if ema_fast > ema_slow else "❌"
+        # BUY: tendencia alcista, SELL: tendencia bajista
+        trend_buy = "🟢" if ema_fast > ema_slow else "❌"
+        trend_sell = "🔴" if ema_fast < ema_slow else "❌"
+        trend_check = f"{trend_buy}BUY {trend_sell}SELL"
 
         # Timing del mercado (simulado)
         timing_score = min(100, max(0, score + 10))  # Basado en score general
         timing_status = "ÓPTIMO" if timing_score >= 80 else "BUENO" if timing_score >= 60 else "REGULAR"
-        timing_check = "✅" if timing_score >= 70 else "❌"
+        # Timing bueno es favorable para ambos
+        timing_buy = "🟢" if timing_score >= 70 else "❌"
+        timing_sell = "🔴" if timing_score >= 70 else "❌"
+        timing_check = f"{timing_buy}BUY {timing_sell}SELL"
 
         # Volatilidad ATR
         atr = data.get('atr', 0)
         volatility_status = "ALTA" if atr > 100 else "MEDIA" if atr > 50 else "BAJA"
-        volatility_check = "✅" if atr > 50 else "❌"
+        # Volatilidad media-alta es buena para trading
+        volatility_buy = "🟢" if atr > 50 else "❌"
+        volatility_sell = "🔴" if atr > 50 else "❌"
+        volatility_check = f"{volatility_buy}BUY {volatility_sell}SELL"
         
         # Targets para BUY y SELL
         tp_buy = data.get('take_profit_buy', 0)
@@ -303,27 +330,7 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
         
         # Señal actual (eliminada - redundante con sistema de confianza)
         
-        # Sistema de niveles de confianza profesional
-        if score >= 90:
-            confidence_class = "confidence-excellent"
-            confidence_label = "EXCELENTE"
-            confidence_emoji = "🔥"
-        elif score >= 75:
-            confidence_class = "confidence-strong"
-            confidence_label = "FUERTE"
-            confidence_emoji = "🎯"
-        elif score >= 60:
-            confidence_class = "confidence-good"
-            confidence_label = "BUENA"
-            confidence_emoji = "✅"
-        elif score >= 40:
-            confidence_class = "confidence-weak"
-            confidence_label = "DÉBIL"
-            confidence_emoji = "⚠️"
-        else:
-            confidence_class = "confidence-poor"
-            confidence_label = "POBRE"
-            confidence_emoji = "❌"
+
 
         # Clases adicionales
         candle_class = "positive" if candle_change > 0 else "negative" if candle_change < 0 else "neutral"
@@ -366,9 +373,7 @@ def generate_crypto_cards(market_data, last_signals, signal_count, bot_running, 
                 </div>
             </div>
             
-            <div class="candle-change {candle_class}" data-candle="{symbol}" title="MOMENTUM 1MIN - Cómo interpretar: 📈 VERDE (+%) = Precio subiendo → Bueno para COMPRAR | 📉 ROJO (-%) = Precio bajando → Bueno para VENDER | 🔥 FUERTE >0.5% = Movimiento potente | ⚡ MEDIO 0.2-0.5% = Movimiento normal | 📊 DÉBIL <0.2% = Movimiento lento">
-                {change_emoji} Momentum 1min: {candle_change:+.2f}% {momentum_strength}
-            </div>
+
             
             <div class="metrics-grid">
                 <div class="metric rsi-metric" title="RSI 1min: Indicador de momentum inmediato. 0-30=Sobreventa (posible rebote), 30-70=Neutral, 70-100=Sobrecompra (posible caída). Ideal para timing exacto de entrada.">
@@ -561,8 +566,8 @@ def get_dashboard_css():
         }
         .status-active { border-left: 4px solid #22c55e; }
         .crypto-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-            gap: 25px; margin-bottom: 25px;
+            display: flex; flex-direction: column;
+            gap: 20px; margin-bottom: 25px;
         }
         .crypto-card {
             background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
@@ -626,7 +631,7 @@ def get_dashboard_css():
         .candle-change { text-align: center; padding: 8px 12px; border-radius: 8px; font-weight: 600; margin-bottom: 15px; }
         .candle-change.positive { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
         .candle-change.negative { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
         .score-metric { grid-column: span 2; }
 
         /* Score Progress Bar */
@@ -688,18 +693,23 @@ def get_dashboard_css():
 
         .criteria-buy { color: #22c55e; }
         .criteria-sell { color: #ef4444; }
-        .metric { background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: 10px; text-align: center; border: 1px solid #475569; position: relative; }
+        .metric { background: rgba(30, 41, 59, 0.6); padding: 8px; border-radius: 8px; text-align: center; border: 1px solid #475569; position: relative; }
 
         .metric-check {
             position: absolute;
-            top: 6px;
-            right: 8px;
-            font-size: 1.1rem;
-            font-weight: bold;
+            top: 4px;
+            right: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 4px;
+            border-radius: 4px;
+            color: white;
+            line-height: 1;
         }
-        .metric-value { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; }
-        .metric-label { font-size: 0.8rem; color: #f1f5f9 !important; margin-top: 4px; font-weight: 500; }
-        .metric-status { font-size: 0.6rem; color: #f1f5f9 !important; margin-top: 2px; font-weight: 400; }
+        .metric-value { font-size: 1rem; font-weight: 700; color: #f1f5f9; }
+        .metric-label { font-size: 0.7rem; color: #f1f5f9 !important; margin-top: 3px; font-weight: 500; }
+        .metric-status { font-size: 0.55rem; color: #f1f5f9 !important; margin-top: 2px; font-weight: 400; }
         .score-metric .metric-label { color: #f1f5f9 !important; font-weight: 600; }
         .trading-scenarios { margin-bottom: 15px; padding: 15px; background: rgba(15, 23, 42, 0.4); border-radius: 12px; border: 1px solid #334155; }
         .scenario-title { font-size: 0.9rem; font-weight: 600; color: #f1f5f9; margin-bottom: 12px; text-align: center; }
@@ -726,19 +736,34 @@ def get_dashboard_css():
         .update-indicator { position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; padding: 10px 18px; border-radius: 25px; font-size: 0.85rem; opacity: 0; transition: all 0.3s ease; z-index: 1000; }
         .update-indicator.show { opacity: 1; }
 
+        .version-footer {
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 10px;
+            border: 1px solid #334155;
+            color: #64748b;
+            font-size: 0.8rem;
+            font-family: 'Courier New', monospace;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container { padding: 10px; }
-            .crypto-card { margin-bottom: 20px; }
+            .crypto-card { margin-bottom: 15px; }
             .header-buttons { gap: 8px; }
             .instructions-btn-compact, .analytics-btn-compact, .logs-btn-compact { padding: 4px 8px; font-size: 0.7rem; }
-            .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
         }
 
         @media (max-width: 480px) {
-            .metrics-grid { grid-template-columns: 1fr; gap: 6px; }
-            .metric { padding: 8px; }
-            .metric-check { font-size: 1rem; top: 4px; right: 6px; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+            .metric { padding: 6px; }
+            .metric-check { font-size: 0.9rem; top: 3px; right: 4px; }
+            .metric-value { font-size: 0.85rem; }
+            .metric-label { font-size: 0.65rem; }
+            .metric-status { font-size: 0.5rem; }
         }
     </style>
     """
