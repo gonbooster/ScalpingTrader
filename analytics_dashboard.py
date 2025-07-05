@@ -94,6 +94,12 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             }}
             .signals-table tr:hover {{ background: rgba(15, 23, 42, 0.4); }}
 
+            /* Estilos específicos para columnas TP/SL */
+            .signals-table th:nth-child(5) {{ color: #fbbf24; }} /* Entrada */
+            .signals-table th:nth-child(6) {{ color: #10b981; }} /* TP/SL $ */
+            .signals-table th:nth-child(7) {{ color: #6366f1; }} /* TP/SL % */
+            .signals-table td:nth-child(5) {{ font-weight: 600; color: #fbbf24; }} /* Entrada */
+
             /* Responsive table */
             .table-container {{ overflow-x: auto; }}
             @media (max-width: 768px) {{
@@ -317,8 +323,9 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                             <th>Símbolo</th>
                             <th>Tipo</th>
                             <th>Score</th>
-                            <th>Precio</th>
-                            <th>TP/SL</th>
+                            <th>Entrada</th>
+                            <th>TP/SL ($)</th>
+                            <th>TP/SL (%)</th>
                             <th>Estado</th>
                             <th>Retorno</th>
                             <th>Tiempo</th>
@@ -410,17 +417,18 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
 
                 rows.forEach(row => {{
                     const cells = row.querySelectorAll('td');
-                    if (cells.length >= 9) {{
+                    if (cells.length >= 10) {{
                         allSignals.push({{
                             timestamp: cells[0].textContent.trim(),
                             symbol: cells[1].textContent.trim(),
                             type: cells[2].textContent.trim(),
                             score: parseInt(cells[3].textContent.replace(/[^0-9]/g, '')) || 0,
-                            price: cells[4].textContent.trim(),
-                            tpsl: cells[5].textContent.trim(),
-                            status: cells[6].textContent.trim(),
-                            return: cells[7].textContent.trim(),
-                            time: cells[8].textContent.trim(),
+                            entry: cells[4].textContent.trim(),
+                            tpsl_dollars: cells[5].textContent.trim(),
+                            tpsl_percent: cells[6].textContent.trim(),
+                            status: cells[7].textContent.trim(),
+                            return: cells[8].textContent.trim(),
+                            time: cells[9].textContent.trim(),
                             html: row.outerHTML
                         }});
                     }}
@@ -706,7 +714,21 @@ def generate_signals_table(recent_signals):
             tp_percent = 0
             sl_percent = 0
 
-        tp_sl_text = f"TP: {tp_percent:+.1f}%<br>SL: {sl_percent:+.1f}%" if tp_price > 0 and sl_price > 0 else "N/A"
+        # Formatear valores absolutos en $
+        if tp_price > 0 and sl_price > 0:
+            # Determinar número de decimales según el precio
+            if entry_price >= 1000:  # BTC
+                decimals = 2
+            elif entry_price >= 100:  # ETH, SOL
+                decimals = 2
+            else:  # Otros
+                decimals = 4
+
+            tp_sl_dollars = f"TP: ${tp_price:,.{decimals}f}<br>SL: ${sl_price:,.{decimals}f}"
+            tp_sl_percent = f"TP: {tp_percent:+.1f}%<br>SL: {sl_percent:+.1f}%"
+        else:
+            tp_sl_dollars = "N/A"
+            tp_sl_percent = "N/A"
 
         html += f"""
         <tr>
@@ -714,8 +736,9 @@ def generate_signals_table(recent_signals):
             <td>{signal.get('symbol', '')}</td>
             <td>{signal.get('signal_type', '').upper()}</td>
             <td>{safe_float(signal.get('score', 0)):.0f}/100</td>
-            <td>${safe_float(signal.get('entry_price', 0)):,.2f}</td>
-            <td style="font-size: 0.85rem; line-height: 1.2;">{tp_sl_text}</td>
+            <td style="font-weight: 600;">${entry_price:,.2f}</td>
+            <td style="font-size: 0.85rem; line-height: 1.2; color: #10b981;">{tp_sl_dollars}</td>
+            <td style="font-size: 0.85rem; line-height: 1.2; color: #6366f1;">{tp_sl_percent}</td>
             <td class="{status_class}"><strong>{result_text}</strong></td>
             <td class="{status_class}">{actual_return:+.2f}%</td>
             <td>{int(time_resolution)} min</td>
