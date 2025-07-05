@@ -108,7 +108,7 @@ class TradingLogic:
             "RSI_15m_bullish": data["rsi_15m"] > 50,
             "EMA_crossover": data["ema_fast"] > data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_excellent": data["score"] >= 90,  # SOLO señales EXCELENTES por email
+            "Confidence_good": data["score"] >= 75,  # Score bueno para validar señal
             "Price_above_EMA": data["price"] > data["ema_fast"],
             "Candle_positive": data["candle_change_percent"] > 0.1
         }
@@ -130,8 +130,8 @@ class TradingLogic:
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos BUY: 5 de 8 condiciones principales + distancia OK
-        required_main = 5
+        # Requerimientos BUY: 4 de 8 condiciones principales + distancia OK (más realista)
+        required_main = 4
         main_valid = main_fulfilled >= required_main
 
         logger.info(f"🔍 BUY {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
@@ -152,7 +152,7 @@ class TradingLogic:
             "RSI_15m_bearish": data["rsi_15m"] < 50,          # Opuesto a BUY
             "EMA_crossunder": data["ema_fast"] < data["ema_slow"],  # Opuesto a BUY
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,  # Mismo que BUY
-            "Confidence_excellent": data["score"] >= 85,      # SELL más conservador
+            "Confidence_good": data["score"] >= 70,      # SELL más conservador
             "Price_below_EMA": data["price"] < data["ema_fast"],    # Opuesto a BUY
             "Candle_negative": data["candle_change_percent"] < -0.1,  # Opuesto a BUY
             "Breakout_candle": data["volume"] > data["vol_avg"] * 1.2 and data["candle_change_percent"] < -0.1  # Ruptura bajista
@@ -167,8 +167,8 @@ class TradingLogic:
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos SELL: 6 de 8 condiciones principales + distancia OK (más estricto)
-        required_main = 6
+        # Requerimientos SELL: 4 de 8 condiciones principales + distancia OK (más realista)
+        required_main = 4
         main_valid = main_fulfilled >= required_main
 
         logger.info(f"🔍 SELL {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
@@ -194,16 +194,16 @@ class TradingLogic:
 
             # Solo verificar límites de email si vamos a enviar email
             if send_email:
-                # SOLO ENVIAR EMAILS PARA SEÑALES EXCELENTES (90+)
-                if data["score"] < 90:
-                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥90)")
+                # SOLO ENVIAR EMAILS PARA SEÑALES EXCELENTES (85+)
+                if data["score"] < 85:
+                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥85)")
                     send_email = False  # Registrar pero no enviar email
 
                 # Verificar límite diario de emails para señales excelentes
-                if send_email and data["score"] < 95 and not self.check_daily_email_limit():
+                if send_email and data["score"] < 92 and not self.check_daily_email_limit():
                     logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails}) - Score: {data['score']}")
                     send_email = False
-                elif send_email and data["score"] >= 95:
+                elif send_email and data["score"] >= 92:
                     logger.info(f"🔥 SEÑAL PREMIUM (Score: {data['score']}) - Bypassing daily limit")
             
             # Calcular price targets

@@ -1,5 +1,4 @@
 # instructions_dashboard.py - Dashboard educativo para principiantes
-from version_info import get_version_badge
 
 def generate_instructions_dashboard():
     """Genera el dashboard de instrucciones educativas"""
@@ -422,7 +421,7 @@ def generate_instructions_dashboard():
                     <strong>Cada criterio cumplido aumenta la probabilidad de éxito de la operación.</strong></p>
 
                     <p><strong>📊 Progress Bar:</strong> Muestra (criterios cumplidos / 8) × 100 + bonus por score alto (≥80)</p>
-                    <p><strong>🎯 Señales:</strong> Solo se envían emails para señales BUY con Score ≥90 (EXCELENTES)</p>
+                    <p><strong>🎯 Señales:</strong> Solo se envían emails para señales BUY con Score ≥85 (EXCELENTES)</p>
                 </div>
 
                 <h3>📋 Los 8 Criterios Reales del Sistema:</h3>
@@ -481,12 +480,12 @@ def generate_instructions_dashboard():
                     <h3>🎯 ¿Cuándo aparecen las señales? (NUEVO SISTEMA)</h3>
                     <div class="score-ranges">
                         <div class="score-range score-excellent">
-                            <div>🔥 Score ≥ 95</div>
+                            <div>🔥 Score ≥ 92</div>
                             <div>PREMIUM</div>
                             <div>Máxima probabilidad + Email</div>
                         </div>
                         <div class="score-range score-excellent">
-                            <div>⭐ Score 90-94</div>
+                            <div>⭐ Score 85-91</div>
                             <div>EXCELENTE</div>
                             <div>Alta probabilidad + Email</div>
                         </div>
@@ -520,16 +519,15 @@ def generate_instructions_dashboard():
 
                     <h3>📊 ¿Qué evalúa el NUEVO Score Realista?</h3>
                     <ul style="margin: 15px 0; padding-left: 20px;">
-                        <li>📈 <strong>Momentum Multi-timeframe (30%)</strong> - RSI 1m, 5m, 15m con aceleración</li>
-                        <li>🔊 <strong>Volumen Inteligente (25%)</strong> - Explosión de volumen y aceleración</li>
-                        <li>🎯 <strong>Price Action (20%)</strong> - Alineación EMAs, precio vs EMA, fuerza de vela</li>
-                        <li>📊 <strong>Volatilidad Controlada (15%)</strong> - ATR óptimo para scalping (0.8-2.5%)</li>
-                        <li>⏰ <strong>Timing Óptimo (10%)</strong> - Horarios de alta liquidez</li>
+                        <li>📈 <strong>Momentum Multi-timeframe (35%)</strong> - RSI 1m, 5m, 15m con aceleración optimizada</li>
+                        <li>🔊 <strong>Volumen Inteligente (30%)</strong> - Explosión de volumen y confirmación de movimiento</li>
+                        <li>🎯 <strong>Price Action (25%)</strong> - Alineación EMAs, precio vs EMA, fuerza de vela</li>
+                        <li>📊 <strong>Volatilidad Controlada (10%)</strong> - ATR óptimo para scalping (0.5-3.0%)</li>
                     </ul>
 
                     <div style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0; border-radius: 8px;">
-                        <strong>🚀 MEJORA CLAVE:</strong> El nuevo sistema es ~20% más preciso que el anterior.
-                        Solo señales con Score ≥90 tienen alta probabilidad de éxito y reciben emails.
+                        <strong>🚀 SISTEMA OPTIMIZADO:</strong> Algoritmo ajustado para máxima precisión en señales de email.
+                        Solo señales con Score ≥85 tienen alta probabilidad de éxito y reciben emails.
                     </div>
                 </div>
 
@@ -634,7 +632,7 @@ def generate_instructions_dashboard():
                         <div class="flow-number">3</div>
                         <div>
                             <strong>🎯 Revisar Score</strong><br>
-                            Solo considera señales con score 90+ (EXCELENTE) o 95+ (PREMIUM). Evita scores menores a 90.
+                            Solo considera señales con score 85+ (EXCELENTE) o 92+ (PREMIUM). Evita scores menores a 85.
                         </div>
                     </div>
 
@@ -642,7 +640,7 @@ def generate_instructions_dashboard():
                         <div class="flow-number">4</div>
                         <div>
                             <strong>📧 Esperar Email</strong><br>
-                            El sistema solo envía emails para señales EXCELENTES (90+ score). Esto garantiza alta calidad.
+                            El sistema solo envía emails para señales EXCELENTES (85+ score). Esto garantiza máxima precisión.
                         </div>
                     </div>
 
@@ -704,9 +702,6 @@ def generate_instructions_dashboard():
 
             </div>
         </div>
-
-        <!-- Badge de versión automático -->
-        {get_version_badge()}
     </body>
     </html>
     """

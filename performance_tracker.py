@@ -559,7 +559,7 @@ class PerformanceTracker:
         pending_count = cursor.fetchone()[0]
         logger.info(f"📊 Señales pendientes: {pending_count}")
 
-        # Estadísticas básicas - SOLO SEÑALES EXCELENTES (Score ≥90)
+        # Estadísticas básicas - SOLO SEÑALES EXCELENTES (Score ≥85)
         cursor.execute('''
             SELECT
                 COUNT(*) as total_signals,
@@ -575,18 +575,18 @@ class PerformanceTracker:
                 SUM(CASE WHEN result LIKE 'WIN%' THEN actual_return ELSE 0 END) as total_profit,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN actual_return ELSE 0 END) as total_loss
             FROM signals
-            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 90
+            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 85
         '''.format(days))
 
         basic_stats = cursor.fetchone()
 
-        # Estadísticas por score - SOLO SEÑALES EXCELENTES (≥90)
+        # Estadísticas por score - SOLO SEÑALES EXCELENTES (≥85)
         cursor.execute('''
             SELECT
                 CASE
-                    WHEN score >= 95 THEN 'PREMIUM (95-100)'
-                    WHEN score >= 90 THEN 'EXCELENTE (90-94)'
-                    ELSE 'NO ANALIZADO (<90)'
+                    WHEN score >= 92 THEN 'PREMIUM (92-100)'
+                    WHEN score >= 85 THEN 'EXCELENTE (85-91)'
+                    ELSE 'NO ANALIZADO (<85)'
                 END as score_range,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
@@ -594,7 +594,7 @@ class PerformanceTracker:
                 MAX(actual_return) as best_return,
                 MIN(actual_return) as worst_return
             FROM signals
-            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 90
+            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 85
             GROUP BY score_range
             ORDER BY MIN(score) DESC
         '''.format(days))

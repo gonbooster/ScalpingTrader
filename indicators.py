@@ -170,75 +170,77 @@ def calculate_realistic_scalping_score(data):
 
     score = 0
 
-    # 1. 📈 MOMENTUM MULTI-TIMEFRAME (30%) - Clave para scalping
+    # 1. 📈 MOMENTUM MULTI-TIMEFRAME (35%) - Clave para scalping
     rsi_1m = data.get("rsi_1m", 50)
-    rsi_5m = data.get("rsi_5m", 50)  # Necesitamos agregar esto
+    rsi_5m = data.get("rsi_5m", 50)
     rsi_15m = data.get("rsi_15m", 50)
 
-    # Momentum ascendente (aceleración de precio)
-    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 55:  # Aceleración alcista fuerte
+    # Momentum ascendente (aceleración de precio) - MÁS GENEROSO
+    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 52:  # Aceleración alcista fuerte
+        score += 20
+    elif rsi_1m > rsi_5m and rsi_1m > 50:  # Momentum positivo
         score += 15
-    elif rsi_1m > rsi_5m and rsi_1m > 52:  # Momentum positivo
+    elif rsi_1m > 48:  # Momentum básico
+        score += 10
+
+    # RSI en zona óptima para scalping - MÁS GENEROSO
+    if 40 <= rsi_1m <= 70:  # Zona óptima ampliada
+        score += 15
+    elif 35 <= rsi_1m <= 75:  # Zona buena
         score += 12
-    elif rsi_1m > 50:  # Momentum básico
+    elif 30 <= rsi_1m <= 80:  # Zona aceptable
         score += 8
 
-    # RSI en zona óptima para scalping
-    if 45 <= rsi_1m <= 65:  # Zona neutra con potencial de movimiento
-        score += 15
-    elif 40 <= rsi_1m <= 70:  # Zona buena
-        score += 12
-    elif 35 <= rsi_1m <= 75:  # Zona aceptable
-        score += 8
-
-    # 2. 🔊 VOLUMEN INTELIGENTE (25%) - Confirmación de movimiento
+    # 2. 🔊 VOLUMEN INTELIGENTE (30%) - Confirmación de movimiento
     volume_ratio = data.get("volume", 1) / max(data.get("vol_avg", 1), 1)
 
-    # Volumen explosivo (señal fuerte)
-    if volume_ratio > 2.5:  # Volumen excepcional
+    # Volumen explosivo (señal fuerte) - MÁS GENEROSO
+    if volume_ratio > 2.0:  # Volumen excepcional
+        score += 30
+    elif volume_ratio > 1.5:  # Volumen muy alto
         score += 25
-    elif volume_ratio > 2.0:  # Volumen muy alto
+    elif volume_ratio > 1.3:  # Volumen alto
         score += 20
-    elif volume_ratio > 1.5:  # Volumen alto
+    elif volume_ratio > 1.1:  # Volumen moderado
         score += 15
-    elif volume_ratio > 1.2:  # Volumen moderado
+    elif volume_ratio > 0.9:  # Volumen normal
         score += 10
-    elif volume_ratio > 1.0:  # Volumen normal
-        score += 5
 
-    # 3. 🎯 PRICE ACTION (20%) - Confirmación técnica
+    # 3. 🎯 PRICE ACTION (25%) - Confirmación técnica
     ema_fast = data.get("ema_fast", 0)
     ema_slow = data.get("ema_slow", 0)
     price = data.get("price", 0)
     candle_change = abs(data.get("candle_change_percent", 0))
 
-    # Alineación de EMAs
+    # Alineación de EMAs - MÁS GENEROSO
     ema_alignment = ema_fast > ema_slow if ema_fast and ema_slow else False
     price_vs_ema = price > ema_fast if price and ema_fast else False
 
-    if ema_alignment and price_vs_ema and candle_change > 0.3:  # Setup perfecto
+    if ema_alignment and price_vs_ema and candle_change > 0.2:  # Setup perfecto
+        score += 25
+    elif ema_alignment and price_vs_ema and candle_change > 0.1:  # Setup bueno
         score += 20
-    elif ema_alignment and price_vs_ema and candle_change > 0.15:  # Setup bueno
-        score += 15
     elif ema_alignment and price_vs_ema:  # Setup básico
-        score += 12
+        score += 15
     elif ema_alignment or price_vs_ema:  # Setup parcial
-        score += 8
+        score += 10
+    else:  # Sin alineación
+        score += 5
 
-    # 4. 📊 VOLATILIDAD CONTROLADA (15%) - Risk management
+    # 4. 📊 VOLATILIDAD CONTROLADA (10%) - Risk management
     atr_value = data.get("atr", 0)
     if price > 0 and atr_value > 0:
         atr_ratio = (atr_value / price) * 100
 
-        # Volatilidad óptima para scalping (ni muy baja ni muy alta)
-        if 0.8 <= atr_ratio <= 2.5:  # Volatilidad perfecta para scalping
-            score += 15
-        elif 0.5 <= atr_ratio <= 3.5:  # Volatilidad buena
-            score += 12
-        elif 0.3 <= atr_ratio <= 5.0:  # Volatilidad aceptable
+        # Volatilidad óptima para scalping - MÁS GENEROSO
+        if 0.5 <= atr_ratio <= 3.0:  # Volatilidad perfecta para scalping
+            score += 10
+        elif 0.3 <= atr_ratio <= 5.0:  # Volatilidad buena
             score += 8
-        elif atr_ratio <= 7.0:  # Volatilidad alta pero manejable
-            score += 5
+        elif atr_ratio <= 7.0:  # Volatilidad aceptable
+            score += 6
+        else:  # Volatilidad muy alta
+            score += 3
     else:
         score += 8  # Score neutro si no hay datos de ATR
 

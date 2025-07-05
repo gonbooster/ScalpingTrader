@@ -158,7 +158,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             
             <div class="warning">
                 ⚠️ DASHBOARD PRIVADO - Solo para análisis interno y mejora del sistema<br>
-                🎯 <strong>NUEVO SISTEMA:</strong> Solo se analizan señales con Score ≥90 (EXCELENTES). Estas son las únicas que envían emails y tienen alta probabilidad de éxito.
+                🎯 <strong>SISTEMA OPTIMIZADO:</strong> Solo se analizan señales con Score ≥85 (EXCELENTES). Estas son las únicas que envían emails y tienen máxima probabilidad de éxito.
             </div>
             
             <div class="stats-grid">
@@ -186,10 +186,10 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     <div class="stat-trend">📈 Total: {safe_float(performance_stats.get('total_profit', 0)):+.2f}% • 📉 Pérdidas: {safe_float(performance_stats.get('total_loss', 0)):+.2f}%</div>
                 </div>
 
-                <div class="stat-card" title="🎯 Score promedio del NUEVO SISTEMA REALISTA. Evalúa: Momentum Multi-timeframe (30%), Volumen Inteligente (25%), Price Action (20%), Volatilidad Controlada (15%), Timing Óptimo (10%). Solo señales ≥90 envían emails y se analizan aquí.">
+                <div class="stat-card" title="🎯 Score promedio del SISTEMA OPTIMIZADO. Evalúa: Momentum Multi-timeframe (35%), Volumen Inteligente (30%), Price Action (25%), Volatilidad Controlada (10%). Solo señales ≥85 envían emails y se analizan aquí.">
                     <div class="stat-value neutral">{safe_float(performance_stats.get('avg_score', 0)):.0f}/100</div>
-                    <div class="stat-label">Score Promedio (Nuevo Sistema)</div>
-                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥90</div>
+                    <div class="stat-label">Score Promedio (Sistema Optimizado)</div>
+                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥85</div>
                 </div>
             </div>
             

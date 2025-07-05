@@ -3,7 +3,7 @@ import os
 import time
 import threading
 from datetime import datetime
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 # Importar módulos propios
 from log_manager import get_logger, get_logs_html_response, get_logs_json_response, rotate_logs
@@ -19,7 +19,6 @@ from config import validate_config, SYMBOLS, PORT
 logger = get_logger()
 
 # === CONFIGURACIÓN ===
-VERSION = "v5.0-MODULAR"
 DEPLOY_TIME = datetime.now().strftime("%m/%d %H:%M")
 
 # Configuración de email desde variables de entorno
@@ -42,7 +41,6 @@ bot_thread = None
 last_analysis_time = None
 using_simulation = False
 
-logger.info(f"🚀 Scalping Bot {VERSION} iniciado")
 logger.info(f"📊 Símbolos: {SYMBOLS}")
 logger.info(f"📧 Email: {'✅' if validate_config() else '❌'}")
 
@@ -266,20 +264,7 @@ def stop_bot():
             "timestamp": datetime.now().isoformat()
         })
 
-@app.route("/status")
-def bot_status():
-    """Endpoint para estado del bot"""
-    return jsonify({
-        "version": VERSION,
-        "deploy_time": DEPLOY_TIME,
-        "bot_running": bot_running,
-        "last_analysis": last_analysis_time.isoformat() if last_analysis_time else None,
-        "signal_count": signal_count,
-        "using_simulation": using_simulation,
-        "symbols": SYMBOLS,
-        "email_configured": validate_config(),
-        "timestamp": datetime.now().isoformat()
-    })
+
 
 @app.route('/instructions')
 def instructions():

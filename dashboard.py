@@ -1,5 +1,6 @@
 def generate_dashboard_html(market_data, last_signals, signal_count, bot_running, last_analysis_time, using_simulation, email_status):
     """Dashboard limpio con diseño profesional"""
+    from version_info import get_version_badge
 
     # Generar filas de cryptos
     crypto_rows = ""
@@ -100,26 +101,26 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         bonus_points = max(0, score - 80) if score >= 80 else 0  # Bonus si score ≥ 80
         progress_percentage = min(100, base_percentage + bonus_points)  # Máximo 100%
 
-        # Sistema de badges actualizado para nuevo scoring
-        if score >= 95:                    # 95%+ = PREMIUM (Solo estos envían email)
+        # Sistema de badges OPTIMIZADO para máxima precisión
+        if score >= 92:                    # 92%+ = PREMIUM (Solo estos envían email)
             signal = "🔥 PREMIUM"
             signal_class = "signal-premium"
-        elif score >= 90:                  # 90-94% = EXCELENTE (Solo estos envían email)
+        elif score >= 85:                  # 85-91% = EXCELENTE (Solo estos envían email)
             signal = "⭐ EXCELENTE"
             signal_class = "signal-excellent"
-        elif score >= 80:                  # 80-89% = FUERTE (No envían email)
+        elif score >= 75:                  # 75-84% = FUERTE (No envían email)
             signal = "✅ FUERTE"
             signal_class = "signal-strong"
-        elif score >= 70:                  # 70-79% = BUENA (No envían email)
+        elif score >= 65:                  # 65-74% = BUENA (No envían email)
             signal = "💡 BUENA"
             signal_class = "signal-good"
-        elif score >= 60:                  # 60-69% = REGULAR (No envían email)
+        elif score >= 50:                  # 50-64% = REGULAR (No envían email)
             signal = "⚠️ REGULAR"
             signal_class = "signal-regular"
-        elif score >= 40:                  # 40-59% = DÉBIL
+        elif score >= 35:                  # 35-49% = DÉBIL
             signal = "⏳ DÉBIL"
             signal_class = "signal-weak"
-        else:                               # 0-39% = NO OPERAR
+        else:                               # 0-34% = NO OPERAR
             signal = "❌ NO OPERAR"
             signal_class = "signal-no"
 
@@ -331,7 +332,6 @@ body {{
     <div class="header-top">
         <div class="header-left">
             <h1 class="dashboard-title">🚀 Trading Dashboard</h1>
-            <div class="version-info">v5.0-MODULAR</div>
         </div>
         <div class="header-right">
             <div class="refresh-indicator" id="refreshIndicator">
@@ -362,7 +362,7 @@ body {{
     <th></th><th></th>
     <th title="RSI 1min entre 30-70 (zona favorable)">RSI1</th><th title="RSI 15min mayor a 50 (tendencia alcista)">RSI15</th>
     <th title="EMA rápida por encima de EMA lenta (tendencia)">EMA</th><th title="Volumen mayor a 1.2x del promedio (interés)">VOL</th>
-    <th title="Score confianza ≥ 75 (da bonus al progress bar)">CONF</th><th title="Precio por encima de EMA rápida (posición)">PRICE</th>
+    <th title="Score confianza ≥ 75 (requiere 4/8 criterios para señal, ≥85 para email)">CONF</th><th title="Precio por encima de EMA rápida (posición)">PRICE</th>
     <th title="Vela actual positiva mayor a 0.1% (momentum)">VELA</th><th title="Ruptura: Volumen alto + vela fuerte">RUPT</th>
     <th></th>
 </tr>
@@ -409,4 +409,8 @@ window.addEventListener('load', () => {{
     setTimeout(hideRefreshIndicator, 2000);
 }});
 </script>
+
+<!-- Badge de versión automático -->
+{get_version_badge()}
+
 </body></html>"""
