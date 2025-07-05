@@ -149,7 +149,7 @@ class PerformanceTracker:
         # Obtener TODAS las señales pendientes (sin límite de tiempo para verificación más agresiva)
         cursor.execute('''
             SELECT * FROM signals
-            WHERE status = 'PENDING'
+            WHERE result IS NULL OR result = 'None'
             ORDER BY timestamp DESC
         ''')
 
@@ -204,7 +204,6 @@ class PerformanceTracker:
             if result:
                 cursor.execute('''
                     UPDATE signals SET
-                    status = 'COMPLETED',
                     result = ?,
                     exit_price = ?,
                     exit_timestamp = ?,
@@ -239,8 +238,12 @@ class PerformanceTracker:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # Obtener todas las señales pendientes
-            cursor.execute('SELECT * FROM signals WHERE status = "PENDING"')
+            # Obtener todas las señales pendientes (incluyendo result NULL)
+            cursor.execute('''
+                SELECT * FROM signals
+                WHERE result IS NULL OR result = "None"
+                ORDER BY timestamp ASC
+            ''')
             pending_signals = cursor.fetchall()
 
             logger.info(f"🔍 Evaluando {len(pending_signals)} señales pendientes...")
@@ -265,42 +268,70 @@ class PerformanceTracker:
                 # Calcular retorno actual
                 actual_return = self.calculate_return(signal_type, entry_price, current_price)
 
-                # Determinar resultado basado en el movimiento de precio
+                # Determinar resultado basado en tiempo y movimiento de precio
                 result = None
-                if signal_type.upper() == 'BUY':
-                    if actual_return >= 1.0:  # +1% = WIN
+
+                # Si han pasado más de 8 horas, marcar como EXPIRED automáticamente
+                if hours_elapsed >= 8:
+                    result = 'EXPIRED'
+                    logger.info(f"📊 ⏰ {symbol} {signal_type}: EXPIRED (8+ horas)")
+                elif signal_type.upper() == 'BUY':
+                    if actual_return >= 1.5:  # +1.5% = WIN claro
                         result = 'WIN_TIME'
-                    elif actual_return <= -0.5:  # -0.5% = LOSS
+                    elif actual_return <= -1.0:  # -1% = LOSS claro
                         result = 'LOSS_TIME'
+                    elif hours_elapsed >= 2:  # Evaluar después de 2 horas con criterios más flexibles
+                        if actual_return >= 0.8:  # +0.8% = WIN después de 2h
+                            result = 'WIN_TIME'
+                        elif actual_return <= -0.5:  # -0.5% = LOSS después de 2h
+                            result = 'LOSS_TIME'
+                        else:
+                            result = 'EXPIRED'  # Neutral = EXPIRED
                     else:
-                        result = 'EXPIRED'  # Neutral = EXPIRED
+                        # Menos de 2 horas, mantener PENDING solo si no hay movimiento claro
+                        if actual_return >= 1.5 or actual_return <= -1.0:
+                            result = 'WIN_TIME' if actual_return >= 1.5 else 'LOSS_TIME'
+                        # Si no hay movimiento claro, mantener como PENDING
                 elif signal_type.upper() == 'SELL':
-                    if actual_return >= 1.0:  # Precio bajó 1% = WIN
+                    if actual_return >= 1.5:  # Precio bajó 1.5% = WIN claro
                         result = 'WIN_TIME'
-                    elif actual_return <= -0.5:  # Precio subió 0.5% = LOSS
+                    elif actual_return <= -1.0:  # Precio subió 1% = LOSS claro
                         result = 'LOSS_TIME'
+                    elif hours_elapsed >= 2:  # Evaluar después de 2 horas con criterios más flexibles
+                        if actual_return >= 0.8:  # Precio bajó 0.8% = WIN después de 2h
+                            result = 'WIN_TIME'
+                        elif actual_return <= -0.5:  # Precio subió 0.5% = LOSS después de 2h
+                            result = 'LOSS_TIME'
+                        else:
+                            result = 'EXPIRED'  # Neutral = EXPIRED
                     else:
-                        result = 'EXPIRED'  # Neutral = EXPIRED
+                        # Menos de 2 horas, mantener PENDING solo si no hay movimiento claro
+                        if actual_return >= 1.5 or actual_return <= -1.0:
+                            result = 'WIN_TIME' if actual_return >= 1.5 else 'LOSS_TIME'
+                        # Si no hay movimiento claro, mantener como PENDING
 
-                # Actualizar señal
-                cursor.execute('''
-                    UPDATE signals SET
-                    status = 'COMPLETED',
-                    result = ?,
-                    exit_price = ?,
-                    exit_timestamp = ?,
-                    actual_return = ?,
-                    time_to_resolution = ?,
-                    notes = 'Evaluación forzada para análisis'
-                    WHERE id = ?
-                ''', (
-                    result, current_price, datetime.now().isoformat(),
-                    actual_return, minutes_elapsed, signal_id
-                ))
+                # Actualizar señal solo si hay un resultado definido
+                if result:
+                    cursor.execute('''
+                        UPDATE signals SET
+                        result = ?,
+                        exit_price = ?,
+                        exit_timestamp = ?,
+                        actual_return = ?,
+                        time_to_resolution = ?,
+                        notes = 'Evaluación forzada para análisis'
+                        WHERE id = ?
+                    ''', (
+                        result, current_price, datetime.now().isoformat(),
+                        actual_return, minutes_elapsed, signal_id
+                    ))
 
-                updated_count += 1
-                win_emoji = "🎯" if "WIN" in result else "❌" if "LOSS" in result else "⏰"
-                logger.info(f"📊 {win_emoji} {symbol} {signal_type}: {result} ({actual_return:+.2f}%)")
+                    updated_count += 1
+                    win_emoji = "🎯" if "WIN" in result else "❌" if "LOSS" in result else "⏰"
+                    logger.info(f"📊 {win_emoji} {symbol} {signal_type}: {result} ({actual_return:+.2f}%)")
+                else:
+                    # Mantener como PENDING si no hay resultado claro
+                    logger.info(f"📊 🔄 {symbol} {signal_type}: Mantener PENDING ({actual_return:+.2f}%)")
 
             conn.commit()
             conn.close()
@@ -311,6 +342,47 @@ class PerformanceTracker:
         except Exception as e:
             logger.error(f"❌ Error en evaluación forzada: {e}")
             return 0
+
+    def get_recent_signals(self, limit=50):
+        """Obtiene las señales recientes con el mismo formato que usa get_performance_stats"""
+        try:
+            cursor = self.conn.cursor()
+
+            cursor.execute('''
+                SELECT * FROM signals
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (limit,))
+
+            signals_raw = cursor.fetchall()
+            recent_signals = []
+
+            for signal in signals_raw:
+                # Función auxiliar para convertir a float de forma segura
+                def safe_float(value, default=0):
+                    try:
+                        return float(value) if value is not None else default
+                    except (ValueError, TypeError):
+                        return default
+
+                recent_signals.append({
+                    'id': signal[0],
+                    'timestamp': signal[1],
+                    'symbol': signal[2],
+                    'signal_type': signal[3],
+                    'entry_price': safe_float(signal[4]),
+                    'score': safe_float(signal[5]),
+                    'result': signal[18] if signal[18] is not None else None,
+                    'actual_return': safe_float(signal[21]),
+                    'time_to_resolution': safe_float(signal[22]),
+                    'today': signal[1][:10] == datetime.now().strftime('%Y-%m-%d') if signal[1] else False
+                })
+
+            return recent_signals
+
+        except Exception as e:
+            logger.error(f"❌ Error obteniendo señales recientes: {e}")
+            return []
 
     def calculate_streaks(self, streak_data):
         """Calcula rachas ganadoras y perdedoras"""
@@ -483,7 +555,7 @@ class PerformanceTracker:
         total_count = cursor.fetchone()[0]
         logger.info(f"📊 Total señales en BD: {total_count}")
 
-        cursor.execute('SELECT COUNT(*) FROM signals WHERE status = "PENDING"')
+        cursor.execute('SELECT COUNT(*) FROM signals WHERE result IS NULL OR result = "None"')
         pending_count = cursor.fetchone()[0]
         logger.info(f"📊 Señales pendientes: {pending_count}")
 
@@ -494,7 +566,7 @@ class PerformanceTracker:
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN 1 ELSE 0 END) as losses,
                 SUM(CASE WHEN result = 'EXPIRED' THEN 1 ELSE 0 END) as expired,
-                SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN result IS NULL OR result = 'None' THEN 1 ELSE 0 END) as pending,
                 AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
                 AVG(score) as avg_score,
                 AVG(CASE WHEN time_to_resolution IS NOT NULL THEN time_to_resolution END) as avg_time_minutes,
@@ -586,7 +658,7 @@ class PerformanceTracker:
                 timestamp,
                 symbol
             FROM signals
-            WHERE status IN ('COMPLETED', 'EXPIRED')
+            WHERE result IS NOT NULL AND result != 'None'
             AND datetime(timestamp) > datetime('now', '-{} days')
             ORDER BY timestamp DESC
         '''.format(days))

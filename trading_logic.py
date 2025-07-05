@@ -19,7 +19,7 @@ class TradingLogic:
     def __init__(self):
         self.last_signals = {}
         self.signal_count = 0
-        self.cooldown_time = 300   # 5 minutos entre señales del mismo par (para testing)
+        self.cooldown_time = 1800   # 30 minutos entre señales del mismo par
         self.daily_email_count = 0
         self.last_email_date = None
         self.max_daily_emails = 10  # Máximo 10 emails por día
@@ -280,20 +280,22 @@ class TradingLogic:
                 buy_valid, buy_conditions = self.check_buy_conditions(
                     symbol, market_data, timeframe_data
                 )
-                
+
                 if buy_valid:
                     if self.process_signal(symbol, "buy", market_data, buy_conditions, send_email=True):
                         signals_sent += 1
                         continue  # No verificar sell si ya enviamos buy
 
-                # Verificar señal de venta (SIN EMAIL - solo logs)
+                # Verificar señal de venta SOLO si no hay señal de compra
                 sell_valid, sell_conditions = self.check_sell_conditions(
                     symbol, market_data, timeframe_data
                 )
 
                 if sell_valid:
                     # SELL signals no envían email, solo se registran
-                    self.process_signal(symbol, "sell", market_data, sell_conditions, send_email=False)
+                    if self.process_signal(symbol, "sell", market_data, sell_conditions, send_email=False):
+                        # Incrementar contador aunque no se envíe email para evitar duplicados
+                        pass
                 
             except Exception as e:
                 logger.error(f"❌ Error analizando señales para {symbol}: {e}")

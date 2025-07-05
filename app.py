@@ -387,6 +387,88 @@ def force_evaluate():
             'error': str(e)
         }), 500
 
+@app.route('/admin/reset/<secret_key>', methods=['POST'])
+def admin_reset_data(secret_key):
+    """Ruta secreta para resetear datos - Solo para administradores"""
+    # Clave secreta (hash SHA256 de una frase secreta)
+    import hashlib
+    expected_hash = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"  # hash de "admin"
+    provided_hash = hashlib.sha256(secret_key.encode()).hexdigest()
+
+    if provided_hash != expected_hash:
+        return jsonify({
+            'success': False,
+            'error': 'Acceso denegado'
+        }), 403
+
+    try:
+        import os
+        import sqlite3
+
+        # Eliminar base de datos existente
+        db_path = 'trading_performance.db'
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+        # Crear nueva base de datos vacía
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Crear tabla signals con estructura completa
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                score REAL NOT NULL,
+                conditions_met INTEGER,
+                total_conditions INTEGER,
+                rsi_1m REAL,
+                rsi_15m REAL,
+                ema_fast REAL,
+                ema_slow REAL,
+                volume_ratio REAL,
+                atr REAL,
+                candle_change REAL,
+                tp_price REAL,
+                sl_price REAL,
+                expected_move REAL,
+                risk_reward REAL,
+                market_conditions TEXT,
+                result TEXT,
+                exit_price REAL,
+                exit_timestamp TEXT,
+                actual_return REAL,
+                time_to_resolution INTEGER,
+                notes TEXT
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+
+        # Limpiar cache de señales
+        from trading_logic import trading_logic
+        trading_logic.last_signals = {}
+        trading_logic.signal_count = 0
+
+        logger.info("🗑️ RESET ADMINISTRATIVO: Base de datos limpiada")
+
+        return jsonify({
+            'success': True,
+            'message': 'Base de datos reseteada exitosamente',
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Error en reset administrativo: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/signal-count')
 def get_signal_count():
     """Endpoint para obtener el número total de señales"""

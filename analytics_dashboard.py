@@ -161,19 +161,19 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             </div>
             
             <div class="stats-grid">
-                <div class="stat-card">
+                <div class="stat-card" title="📊 Total de señales generadas por el algoritmo de trading. Incluye todas las señales BUY/SELL procesadas desde el inicio del sistema.">
                     <div class="stat-value win-rate">{total_signals}</div>
                     <div class="stat-label">Total Señales</div>
                     <div class="stat-trend">✅ {performance_stats.get('wins', 0)} wins • ❌ {performance_stats.get('losses', 0)} losses • ⏰ {performance_stats.get('expired', 0)} expired • 🔄 {performance_stats.get('pending', 0)} pending</div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card" title="📈 Porcentaje de señales exitosas (WIN) vs total de señales completadas. Se calcula como: (Señales WIN / Señales Completadas) × 100. No incluye señales pendientes.">
                     <div class="stat-value {'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'}">{win_rate:.1f}%</div>
                     <div class="stat-label">Win Rate</div>
                     <div class="stat-trend">{'🎯 Excelente' if win_rate >= 70 else '✅ Bueno' if win_rate >= 60 else '⚠️ Mejorable' if win_rate >= 50 else '❌ Revisar'}</div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card" title="💰 Retorno promedio de todas las señales completadas. Se calcula como: Suma de todos los retornos / Número de señales completadas. Incluye tanto ganancias como pérdidas.">
                     <div class="stat-value {'win-rate' if avg_return > 0 else 'loss-rate'}">{avg_return:+.2f}%</div>
                     <div class="stat-label">Retorno Promedio</div>
                     <div class="stat-trend">💰 Mejor: {safe_float(performance_stats.get('best_return', 0)):+.2f}% • 📉 Peor: {safe_float(performance_stats.get('worst_return', 0)):+.2f}%</div>
@@ -185,7 +185,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     <div class="stat-trend">📈 Total: {safe_float(performance_stats.get('total_profit', 0)):+.2f}% • 📉 Pérdidas: {safe_float(performance_stats.get('total_loss', 0)):+.2f}%</div>
                 </div>
 
-                <div class="stat-card">
+                <div class="stat-card" title="🎯 Score promedio de confianza de las señales. Se calcula evaluando 8 criterios técnicos: RSI (4 timeframes), momentum (4 timeframes), volumen, distancia de precio, volatilidad y alineación de tendencia. Cada criterio aporta puntos al score final de 0-100.">
                     <div class="stat-value neutral">{safe_float(performance_stats.get('avg_score', 0)):.0f}/100</div>
                     <div class="stat-label">Score Promedio</div>
                     <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min</div>
@@ -255,6 +255,59 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             
             <div class="chart-card">
                 <div class="chart-title">📋 Señales Recientes</div>
+
+                <!-- Filtros y Controles -->
+                <div class="filters-container" style="margin-bottom: 20px; padding: 15px; background: rgba(15, 23, 42, 0.3); border-radius: 8px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                    <div class="filter-group">
+                        <label style="color: #94a3b8; font-size: 0.9rem; margin-right: 8px;">Símbolo:</label>
+                        <select id="symbolFilter" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0;">
+                            <option value="">Todos</option>
+                            <option value="BTCUSDT">₿ BTCUSDT</option>
+                            <option value="ETHUSDT">Ξ ETHUSDT</option>
+                            <option value="SOLUSDT">◎ SOLUSDT</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label style="color: #94a3b8; font-size: 0.9rem; margin-right: 8px;">Tipo:</label>
+                        <select id="typeFilter" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0;">
+                            <option value="">Todos</option>
+                            <option value="buy">🟢 BUY</option>
+                            <option value="sell">🔴 SELL</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label style="color: #94a3b8; font-size: 0.9rem; margin-right: 8px;">Estado:</label>
+                        <select id="statusFilter" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0;">
+                            <option value="">Todos</option>
+                            <option value="WIN">✅ WIN</option>
+                            <option value="LOSS">❌ LOSS</option>
+                            <option value="EXPIRED">⏰ EXPIRED</option>
+                            <option value="PENDING">🔄 PENDING</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label style="color: #94a3b8; font-size: 0.9rem; margin-right: 8px;">Score Min:</label>
+                        <input type="number" id="scoreFilter" min="0" max="100" placeholder="0-100" style="width: 80px; padding: 5px 8px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0;">
+                    </div>
+
+                    <div class="filter-group">
+                        <label style="color: #94a3b8; font-size: 0.9rem; margin-right: 8px;">Por página:</label>
+                        <select id="pageSize" style="padding: 5px 10px; border-radius: 4px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0;">
+                            <option value="10">10</option>
+                            <option value="25" selected>25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+
+                    <button onclick="resetFilters()" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #334155; background: #374151; color: #e2e8f0; cursor: pointer;">
+                        🔄 Reset
+                    </button>
+                </div>
+
                 <div class="table-container">
                     <table class="signals-table">
                     <thead>
@@ -269,7 +322,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                             <th>Tiempo</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="signalsTableBody">
                         {generate_signals_table(recent_signals)}
                     </tbody>
                     </table>
@@ -337,6 +390,156 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             setInterval(updateTimestamp, 1000);
             setInterval(updateCountdown, 1000);
             setInterval(autoEvaluateIfNeeded, 10000); // Verificar cada 10 segundos
+
+            // JavaScript para filtros y paginación
+            let allSignals = [];
+            let filteredSignals = [];
+            let currentPage = 1;
+            let pageSize = 25;
+
+            // Cargar datos iniciales
+            function loadSignalsData() {{
+                const tableBody = document.getElementById('signalsTableBody');
+                if (!tableBody) return;
+
+                // Extraer datos de la tabla existente
+                const rows = tableBody.querySelectorAll('tr');
+                allSignals = [];
+
+                rows.forEach(row => {{
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 8) {{
+                        allSignals.push({{
+                            timestamp: cells[0].textContent.trim(),
+                            symbol: cells[1].textContent.trim(),
+                            type: cells[2].textContent.trim(),
+                            score: parseInt(cells[3].textContent.replace(/[^0-9]/g, '')) || 0,
+                            price: cells[4].textContent.trim(),
+                            status: cells[5].textContent.trim(),
+                            return: cells[6].textContent.trim(),
+                            time: cells[7].textContent.trim(),
+                            html: row.outerHTML
+                        }});
+                    }}
+                }});
+
+                filteredSignals = [...allSignals];
+                applyFilters();
+            }}
+
+            // Aplicar filtros
+            function applyFilters() {{
+                const symbolFilter = document.getElementById('symbolFilter').value;
+                const typeFilter = document.getElementById('typeFilter').value;
+                const statusFilter = document.getElementById('statusFilter').value;
+                const scoreFilter = parseInt(document.getElementById('scoreFilter').value) || 0;
+
+                filteredSignals = allSignals.filter(signal => {{
+                    if (symbolFilter && !signal.symbol.includes(symbolFilter)) return false;
+                    if (typeFilter && !signal.type.toLowerCase().includes(typeFilter)) return false;
+                    if (statusFilter && !signal.status.includes(statusFilter)) return false;
+                    if (scoreFilter && signal.score < scoreFilter) return false;
+                    return true;
+                }});
+
+                currentPage = 1;
+                updateTable();
+                updatePagination();
+            }}
+
+            // Actualizar tabla
+            function updateTable() {{
+                const tableBody = document.getElementById('signalsTableBody');
+                if (!tableBody) return;
+
+                const startIndex = (currentPage - 1) * pageSize;
+                const endIndex = startIndex + pageSize;
+                const pageSignals = filteredSignals.slice(startIndex, endIndex);
+
+                if (pageSignals.length === 0) {{
+                    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #94a3b8; padding: 20px;">No hay señales que coincidan con los filtros</td></tr>';
+                }} else {{
+                    tableBody.innerHTML = pageSignals.map(signal => signal.html).join('');
+                }}
+            }}
+
+            // Actualizar paginación
+            function updatePagination() {{
+                const totalPages = Math.ceil(filteredSignals.length / pageSize);
+                let paginationHtml = '';
+
+                if (totalPages > 1) {{
+                    paginationHtml = '<div style="margin-top: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">';
+
+                    // Botón anterior
+                    if (currentPage > 1) {{
+                        paginationHtml += '<button onclick="changePage(' + (currentPage - 1) + ')" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #334155; background: #374151; color: #e2e8f0; cursor: pointer;">← Anterior</button>';
+                    }}
+
+                    // Números de página
+                    const startPage = Math.max(1, currentPage - 2);
+                    const endPage = Math.min(totalPages, currentPage + 2);
+
+                    for (let i = startPage; i <= endPage; i++) {{
+                        const isActive = i === currentPage;
+                        paginationHtml += '<button onclick="changePage(' + i + ')" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #334155; background: ' + (isActive ? '#3b82f6' : '#374151') + '; color: #e2e8f0; cursor: pointer; font-weight: ' + (isActive ? '600' : 'normal') + ';">' + i + '</button>';
+                    }}
+
+                    // Botón siguiente
+                    if (currentPage < totalPages) {{
+                        paginationHtml += '<button onclick="changePage(' + (currentPage + 1) + ')" style="padding: 8px 12px; border-radius: 4px; border: 1px solid #334155; background: #374151; color: #e2e8f0; cursor: pointer;">Siguiente →</button>';
+                    }}
+
+                    paginationHtml += '<span style="color: #94a3b8; margin-left: 15px;">Página ' + currentPage + ' de ' + totalPages + ' (' + filteredSignals.length + ' señales)</span>';
+                    paginationHtml += '</div>';
+                }}
+
+                // Agregar paginación después de la tabla
+                let paginationContainer = document.getElementById('paginationContainer');
+                if (!paginationContainer) {{
+                    paginationContainer = document.createElement('div');
+                    paginationContainer.id = 'paginationContainer';
+                    document.querySelector('.table-container').after(paginationContainer);
+                }}
+                paginationContainer.innerHTML = paginationHtml;
+            }}
+
+            // Cambiar página
+            function changePage(page) {{
+                currentPage = page;
+                updateTable();
+                updatePagination();
+            }}
+
+            // Reset filtros
+            function resetFilters() {{
+                document.getElementById('symbolFilter').value = '';
+                document.getElementById('typeFilter').value = '';
+                document.getElementById('statusFilter').value = '';
+                document.getElementById('scoreFilter').value = '';
+                document.getElementById('pageSize').value = '25';
+                pageSize = 25;
+                applyFilters();
+            }}
+
+            // Inicializar filtros cuando la página carga
+            setTimeout(() => {{
+                loadSignalsData();
+
+                // Event listeners para filtros
+                document.getElementById('symbolFilter').addEventListener('change', applyFilters);
+                document.getElementById('typeFilter').addEventListener('change', applyFilters);
+                document.getElementById('statusFilter').addEventListener('change', applyFilters);
+                document.getElementById('scoreFilter').addEventListener('input', applyFilters);
+
+                // Tamaño de página
+                document.getElementById('pageSize').addEventListener('change', function() {{
+                    pageSize = parseInt(this.value);
+                    currentPage = 1;
+                    updateTable();
+                    updatePagination();
+                }});
+            }}, 1000);
         </script>
 
     </body>
@@ -421,25 +624,77 @@ def generate_signals_table(recent_signals):
     """Genera la tabla de señales recientes"""
     if not recent_signals:
         return "<tr><td colspan='8' style='text-align: center; color: #94a3b8;'>No hay señales recientes</td></tr>"
-    
+
     html = ""
     for signal in recent_signals[:20]:  # Últimas 20 señales
-        status_class = {
-            'WIN_TP': 'status-win',
-            'LOSS_SL': 'status-loss',
-            'PENDING': 'status-pending'
-        }.get(signal.get('result', 'PENDING'), 'status-pending')
-        
+        # Mapear resultado a texto legible - SINCRONIZADO CON CARDS
+        result_raw = signal.get('result')
+
+        # Debug: mostrar el valor real
+        print(f"DEBUG: signal {signal.get('id')} result_raw = '{result_raw}' (type: {type(result_raw)})")
+
+        if result_raw in ['WIN', 'WIN_TP', 'WIN_TIME'] or result_raw == 1:
+            result_text = '✅ WIN'
+            status_class = 'status-win'
+        elif result_raw in ['LOSS', 'LOSS_SL', 'LOSS_TIME'] or result_raw == 0:
+            result_text = '❌ LOSS'
+            status_class = 'status-loss'
+        elif result_raw == 'EXPIRED' or result_raw == 2:
+            result_text = '⏰ EXPIRED'
+            status_class = 'status-pending'
+        elif result_raw is None or str(result_raw) == 'None' or result_raw == '':
+            result_text = '🔄 PENDING'
+            status_class = 'status-pending'
+        else:
+            # Si es un número extraño, convertir a estado
+            try:
+                num_result = float(result_raw)
+                if num_result == 1:
+                    result_text = '✅ WIN'
+                    status_class = 'status-win'
+                elif num_result == 0:
+                    result_text = '❌ LOSS'
+                    status_class = 'status-loss'
+                elif num_result == 2:
+                    result_text = '⏰ EXPIRED'
+                    status_class = 'status-pending'
+                else:
+                    result_text = '🔄 PENDING'
+                    status_class = 'status-pending'
+            except:
+                # Valor desconocido, mostrar tal como está para debug
+                result_text = f'❓ {result_raw}'
+                status_class = 'status-pending'
+
+        # Calcular retorno real
+        actual_return = safe_float(signal.get('actual_return', 0))
+
+        # Calcular tiempo transcurrido más realista
+        time_resolution = safe_float(signal.get('time_to_resolution', 0))
+        if time_resolution == 0 or time_resolution > 1000:
+            try:
+                from datetime import datetime
+                timestamp_str = signal.get('timestamp', '')
+                if 'T' in timestamp_str:
+                    signal_time = datetime.fromisoformat(timestamp_str.replace('T', ' '))
+                    now = datetime.now()
+                    time_diff = (now - signal_time).total_seconds() / 60
+                    time_resolution = min(int(time_diff), 480)  # Max 8 horas
+                else:
+                    time_resolution = 0
+            except:
+                time_resolution = 0
+
         html += f"""
         <tr>
             <td>{signal.get('timestamp', '')[:16]}</td>
             <td>{signal.get('symbol', '')}</td>
             <td>{signal.get('signal_type', '').upper()}</td>
-            <td>{signal.get('score', 0)}/100</td>
+            <td>{safe_float(signal.get('score', 0)):.0f}/100</td>
             <td>${safe_float(signal.get('entry_price', 0)):,.2f}</td>
-            <td class="{status_class}">{signal.get('result', 'None')}</td>
-            <td>{safe_float(signal.get('actual_return', 0)):+.2f}%</td>
-            <td>{int(safe_float(signal.get('time_to_resolution', 0)))} min</td>
+            <td class="{status_class}"><strong>{result_text}</strong></td>
+            <td class="{status_class}">{actual_return:+.2f}%</td>
+            <td>{int(time_resolution)} min</td>
         </tr>
         """
     return html
@@ -451,27 +706,20 @@ def get_analytics_data():
     # Obtener estadísticas de rendimiento
     performance_stats = performance_tracker.get_performance_stats(30)
     
-    # Obtener señales recientes
+    # Obtener señales recientes directamente de la base de datos
     conn = sqlite3.connect(performance_tracker.db_path)
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        SELECT * FROM signals 
-        ORDER BY timestamp DESC 
+        SELECT * FROM signals
+        ORDER BY timestamp DESC
         LIMIT 50
     ''')
-    
+
     signals_raw = cursor.fetchall()
     recent_signals = []
-    
-    for signal in signals_raw:
-        # Función auxiliar para convertir a float de forma segura
-        def safe_float(value, default=0):
-            try:
-                return float(value) if value is not None else default
-            except (ValueError, TypeError):
-                return default
 
+    for signal in signals_raw:
         recent_signals.append({
             'id': signal[0],
             'timestamp': signal[1],
@@ -479,12 +727,12 @@ def get_analytics_data():
             'signal_type': signal[3],
             'entry_price': safe_float(signal[4]),
             'score': safe_float(signal[5]),
-            'result': signal[18] if signal[18] is not None else 'None',
+            'result': signal[18] if signal[18] is not None else None,
             'actual_return': safe_float(signal[21]),
             'time_to_resolution': safe_float(signal[22]),
-            'today': signal[1][:10] == datetime.now().strftime('%Y-%m-%d')
+            'today': signal[1][:10] == datetime.now().strftime('%Y-%m-%d') if signal[1] else False
         })
-    
+
     conn.close()
     
     # Tendencias de mercado (placeholder)
