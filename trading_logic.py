@@ -108,7 +108,7 @@ class TradingLogic:
             "RSI_15m_bullish": data["rsi_15m"] > 50,
             "EMA_crossover": data["ema_fast"] > data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_good": data["score"] >= 75,  # Señales BUENAS o mejores por email
+            "Confidence_excellent": data["score"] >= 90,  # SOLO señales EXCELENTES por email
             "Price_above_EMA": data["price"] > data["ema_fast"],
             "Candle_positive": data["candle_change_percent"] > 0.1
         }
@@ -152,7 +152,7 @@ class TradingLogic:
             "RSI_15m_bearish": data["rsi_15m"] < 50,          # Opuesto a BUY
             "EMA_crossunder": data["ema_fast"] < data["ema_slow"],  # Opuesto a BUY
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,  # Mismo que BUY
-            "Confidence_good": data["score"] >= 75,           # Mismo que BUY
+            "Confidence_excellent": data["score"] >= 85,      # SELL más conservador
             "Price_below_EMA": data["price"] < data["ema_fast"],    # Opuesto a BUY
             "Candle_negative": data["candle_change_percent"] < -0.1,  # Opuesto a BUY
             "Breakout_candle": data["volume"] > data["vol_avg"] * 1.2 and data["candle_change_percent"] < -0.1  # Ruptura bajista
@@ -194,11 +194,16 @@ class TradingLogic:
 
             # Solo verificar límites de email si vamos a enviar email
             if send_email:
-                # Verificar límite diario de emails (excepto señales premium)
-                if data["score"] < 95 and not self.check_daily_email_limit():
+                # SOLO ENVIAR EMAILS PARA SEÑALES EXCELENTES (90+)
+                if data["score"] < 90:
+                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥90)")
+                    send_email = False  # Registrar pero no enviar email
+
+                # Verificar límite diario de emails para señales excelentes
+                if send_email and data["score"] < 95 and not self.check_daily_email_limit():
                     logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails}) - Score: {data['score']}")
-                    return False
-                elif data["score"] >= 95:
+                    send_email = False
+                elif send_email and data["score"] >= 95:
                     logger.info(f"🔥 SEÑAL PREMIUM (Score: {data['score']}) - Bypassing daily limit")
             
             # Calcular price targets

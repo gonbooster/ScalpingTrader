@@ -120,9 +120,9 @@ def calculate_volume_sma(volumes, period=20):
     return np.mean(volumes_array[-period:])
 
 def calculate_confidence_score(rsi_1m, rsi_15m, volume_ratio, adx, macro_trend):
-    """Calcula un score de confianza basado en múltiples indicadores"""
+    """SISTEMA LEGACY - Mantenido por compatibilidad"""
     score = 0
-    
+
     # RSI 1m (peso: 25%)
     if 30 <= rsi_1m <= 70:
         score += 25
@@ -130,7 +130,7 @@ def calculate_confidence_score(rsi_1m, rsi_15m, volume_ratio, adx, macro_trend):
         score += 15
     elif 20 <= rsi_1m <= 80:
         score += 10
-    
+
     # RSI 15m (peso: 25%)
     if 30 <= rsi_15m <= 70:
         score += 25
@@ -138,7 +138,7 @@ def calculate_confidence_score(rsi_1m, rsi_15m, volume_ratio, adx, macro_trend):
         score += 15
     elif 20 <= rsi_15m <= 80:
         score += 10
-    
+
     # Volumen (peso: 20%)
     if volume_ratio > 1.5:
         score += 20
@@ -146,7 +146,7 @@ def calculate_confidence_score(rsi_1m, rsi_15m, volume_ratio, adx, macro_trend):
         score += 15
     elif volume_ratio > 1.0:
         score += 10
-    
+
     # ADX (peso: 15%)
     if adx > 40:
         score += 15
@@ -154,12 +154,114 @@ def calculate_confidence_score(rsi_1m, rsi_15m, volume_ratio, adx, macro_trend):
         score += 10
     elif adx > 20:
         score += 5
-    
+
     # Macro Trend (peso: 15%)
     if macro_trend:
         score += 15
-    
+
     return min(score, 100)
+
+def calculate_realistic_scalping_score(data):
+    """
+    🚀 NUEVO SISTEMA DE SCORING REALISTA PARA SCALPING CRYPTO
+    Optimizado para precisión y efectividad en trading de alta frecuencia
+    """
+    from datetime import datetime
+
+    score = 0
+
+    # 1. 📈 MOMENTUM MULTI-TIMEFRAME (30%) - Clave para scalping
+    rsi_1m = data.get("rsi_1m", 50)
+    rsi_5m = data.get("rsi_5m", 50)  # Necesitamos agregar esto
+    rsi_15m = data.get("rsi_15m", 50)
+
+    # Momentum ascendente (aceleración de precio)
+    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 55:  # Aceleración alcista fuerte
+        score += 15
+    elif rsi_1m > rsi_5m and rsi_1m > 52:  # Momentum positivo
+        score += 12
+    elif rsi_1m > 50:  # Momentum básico
+        score += 8
+
+    # RSI en zona óptima para scalping
+    if 45 <= rsi_1m <= 65:  # Zona neutra con potencial de movimiento
+        score += 15
+    elif 40 <= rsi_1m <= 70:  # Zona buena
+        score += 12
+    elif 35 <= rsi_1m <= 75:  # Zona aceptable
+        score += 8
+
+    # 2. 🔊 VOLUMEN INTELIGENTE (25%) - Confirmación de movimiento
+    volume_ratio = data.get("volume", 1) / max(data.get("vol_avg", 1), 1)
+
+    # Volumen explosivo (señal fuerte)
+    if volume_ratio > 2.5:  # Volumen excepcional
+        score += 25
+    elif volume_ratio > 2.0:  # Volumen muy alto
+        score += 20
+    elif volume_ratio > 1.5:  # Volumen alto
+        score += 15
+    elif volume_ratio > 1.2:  # Volumen moderado
+        score += 10
+    elif volume_ratio > 1.0:  # Volumen normal
+        score += 5
+
+    # 3. 🎯 PRICE ACTION (20%) - Confirmación técnica
+    ema_fast = data.get("ema_fast", 0)
+    ema_slow = data.get("ema_slow", 0)
+    price = data.get("price", 0)
+    candle_change = abs(data.get("candle_change_percent", 0))
+
+    # Alineación de EMAs
+    ema_alignment = ema_fast > ema_slow if ema_fast and ema_slow else False
+    price_vs_ema = price > ema_fast if price and ema_fast else False
+
+    if ema_alignment and price_vs_ema and candle_change > 0.3:  # Setup perfecto
+        score += 20
+    elif ema_alignment and price_vs_ema and candle_change > 0.15:  # Setup bueno
+        score += 15
+    elif ema_alignment and price_vs_ema:  # Setup básico
+        score += 12
+    elif ema_alignment or price_vs_ema:  # Setup parcial
+        score += 8
+
+    # 4. 📊 VOLATILIDAD CONTROLADA (15%) - Risk management
+    atr_value = data.get("atr", 0)
+    if price > 0 and atr_value > 0:
+        atr_ratio = (atr_value / price) * 100
+
+        # Volatilidad óptima para scalping (ni muy baja ni muy alta)
+        if 0.8 <= atr_ratio <= 2.5:  # Volatilidad perfecta para scalping
+            score += 15
+        elif 0.5 <= atr_ratio <= 3.5:  # Volatilidad buena
+            score += 12
+        elif 0.3 <= atr_ratio <= 5.0:  # Volatilidad aceptable
+            score += 8
+        elif atr_ratio <= 7.0:  # Volatilidad alta pero manejable
+            score += 5
+    else:
+        score += 8  # Score neutro si no hay datos de ATR
+
+    # 5. ⏰ TIMING Y LIQUIDEZ (10%) - Horarios óptimos
+    try:
+        hour = datetime.now().hour
+
+        # Horarios de alta liquidez y actividad
+        if 8 <= hour <= 22:  # Horarios principales (Europa + América)
+            score += 10
+        elif 6 <= hour <= 24:  # Horarios extendidos
+            score += 7
+        elif 0 <= hour <= 2:  # Horarios asiáticos
+            score += 5
+        else:  # Horarios de baja liquidez
+            score += 2
+    except:
+        score += 5  # Score neutro si hay error con la hora
+
+    # Asegurar que el score esté en rango válido
+    final_score = max(0, min(score, 100))
+
+    return final_score
 
 def calculate_price_targets(current_price, atr_value, signal_type, symbol):
     """Calcula objetivos de precio basados en ATR y volatilidad"""

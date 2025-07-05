@@ -157,7 +157,8 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             </div>
             
             <div class="warning">
-                ⚠️ DASHBOARD PRIVADO - Solo para análisis interno y mejora del sistema
+                ⚠️ DASHBOARD PRIVADO - Solo para análisis interno y mejora del sistema<br>
+                🎯 <strong>NUEVO SISTEMA:</strong> Solo se analizan señales con Score ≥90 (EXCELENTES). Estas son las únicas que envían emails y tienen alta probabilidad de éxito.
             </div>
             
             <div class="stats-grid">
@@ -185,10 +186,10 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     <div class="stat-trend">📈 Total: {safe_float(performance_stats.get('total_profit', 0)):+.2f}% • 📉 Pérdidas: {safe_float(performance_stats.get('total_loss', 0)):+.2f}%</div>
                 </div>
 
-                <div class="stat-card" title="🎯 Score promedio de confianza de las señales. Se calcula evaluando 8 criterios técnicos: RSI (4 timeframes), momentum (4 timeframes), volumen, distancia de precio, volatilidad y alineación de tendencia. Cada criterio aporta puntos al score final de 0-100.">
+                <div class="stat-card" title="🎯 Score promedio del NUEVO SISTEMA REALISTA. Evalúa: Momentum Multi-timeframe (30%), Volumen Inteligente (25%), Price Action (20%), Volatilidad Controlada (15%), Timing Óptimo (10%). Solo señales ≥90 envían emails y se analizan aquí.">
                     <div class="stat-value neutral">{safe_float(performance_stats.get('avg_score', 0)):.0f}/100</div>
-                    <div class="stat-label">Score Promedio</div>
-                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min</div>
+                    <div class="stat-label">Score Promedio (Nuevo Sistema)</div>
+                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥90</div>
                 </div>
             </div>
             

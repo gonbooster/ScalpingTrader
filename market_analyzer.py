@@ -112,6 +112,7 @@ class MarketAnalyzer:
             ema_fast_val = calculate_ema(closes_1m, params["ema_fast"])
             ema_slow_val = calculate_ema(closes_1m, params["ema_slow"])
             rsi_1m = calculate_rsi(closes_1m)
+            rsi_5m = calculate_rsi(closes_5m)  # Agregado para nuevo scoring
             atr_val = calculate_atr(highs_1m, lows_1m, closes_1m)
             adx_val = calculate_adx(highs_1m, lows_1m, closes_1m)
             
@@ -142,10 +143,24 @@ class MarketAnalyzer:
                 ema_1h = calculate_ema(closes_1h, 20)
                 macro_trend = close_now > ema_1h
             
-            # Score de confianza
-            confidence_score = calculate_confidence_score(
-                rsi_1m, rsi_15m, vol_now/vol_avg if vol_avg > 0 else 1, adx_val, macro_trend
-            )
+            # Score de confianza - NUEVO SISTEMA REALISTA
+            from indicators import calculate_realistic_scalping_score
+
+            # Preparar datos para el nuevo scoring
+            scoring_data = {
+                "rsi_1m": rsi_1m,
+                "rsi_5m": rsi_5m,
+                "rsi_15m": rsi_15m,
+                "volume": vol_now,
+                "vol_avg": vol_avg,
+                "ema_fast": ema_fast_val,
+                "ema_slow": ema_slow_val,
+                "price": close_now,
+                "candle_change_percent": candle_change_percent,
+                "atr": atr_val
+            }
+
+            confidence_score = calculate_realistic_scalping_score(scoring_data)
             
             # Calcular % de cambio de vela actual
             open_price = float(data_1m[0][1])
@@ -223,7 +238,7 @@ class MarketAnalyzer:
             "RSI_15m_bullish": rsi_15m > 50,
             "EMA_crossover": ema_fast > ema_slow,
             "Volume_high": volume > vol_avg * 1.2,
-            "Confidence_good": score >= 75,
+            "Confidence_excellent": score >= 90,
             "Price_above_EMA": price > ema_fast,
             "Candle_positive": candle_change > 0.1,
             "Breakout_candle": volume > vol_avg * 1.2 and candle_change > 0.1  # Simplificado para dashboard
@@ -245,7 +260,7 @@ class MarketAnalyzer:
             "RSI_15m_bearish": rsi_15m < 50,
             "EMA_crossunder": ema_fast < ema_slow,
             "Volume_high": volume > vol_avg * 1.2,
-            "Confidence_good": score >= 75,
+            "Confidence_excellent": score >= 85,
             "Price_below_EMA": price < ema_fast,
             "Candle_negative": candle_change < -0.1,
             "Breakout_candle": volume > vol_avg * 1.2 and candle_change < -0.1  # Simplificado para dashboard

@@ -56,11 +56,15 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         else:
             c4, c4_intensity = "○", "BAJO"
 
-        # Score con intensidad
-        if score >= 90:
+        # Score con intensidad - NUEVO SISTEMA
+        if score >= 95:
+            c5, c5_intensity = "🔥", "PREMIUM"
+        elif score >= 90:
             c5, c5_intensity = "🟢", "EXCELENTE"
-        elif score >= 75:
+        elif score >= 80:
             c5, c5_intensity = "✓", "BUENO"
+        elif score >= 70:
+            c5, c5_intensity = "⚠️", "REGULAR"
         else:
             c5, c5_intensity = "○", "DÉBIL"
 
@@ -91,28 +95,31 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
 
         count = [c1,c2,c3,c4,c5,c6,c7,c8].count("✓")
 
-        # PROGRESS BAR CON BONUS POR SCORE ALTO
+        # PROGRESS BAR CON NUEVO SISTEMA DE SCORING
         base_percentage = (count / 8) * 100  # Base: criterios cumplidos
-        bonus_points = max(0, score - 75) if score >= 75 else 0  # Bonus si score ≥ 75
+        bonus_points = max(0, score - 80) if score >= 80 else 0  # Bonus si score ≥ 80
         progress_percentage = min(100, base_percentage + bonus_points)  # Máximo 100%
 
-        # Sistema de badges mejorado con múltiples niveles
-        if progress_percentage >= 85:      # 85%+ = PREMIUM
+        # Sistema de badges actualizado para nuevo scoring
+        if score >= 95:                    # 95%+ = PREMIUM (Solo estos envían email)
             signal = "🔥 PREMIUM"
             signal_class = "signal-premium"
-        elif progress_percentage >= 75:    # 75-84% = FUERTE
-            signal = "⭐ FUERTE"
+        elif score >= 90:                  # 90-94% = EXCELENTE (Solo estos envían email)
+            signal = "⭐ EXCELENTE"
+            signal_class = "signal-excellent"
+        elif score >= 80:                  # 80-89% = FUERTE (No envían email)
+            signal = "✅ FUERTE"
             signal_class = "signal-strong"
-        elif progress_percentage >= 60:    # 60-74% = BUENA
-            signal = "✅ BUENA"
+        elif score >= 70:                  # 70-79% = BUENA (No envían email)
+            signal = "💡 BUENA"
             signal_class = "signal-good"
-        elif progress_percentage >= 40:    # 40-59% = DÉBIL
-            signal = "⚠️ DÉBIL"
+        elif score >= 60:                  # 60-69% = REGULAR (No envían email)
+            signal = "⚠️ REGULAR"
+            signal_class = "signal-regular"
+        elif score >= 40:                  # 40-59% = DÉBIL
+            signal = "⏳ DÉBIL"
             signal_class = "signal-weak"
-        elif progress_percentage >= 25:    # 25-39% = ESPERAR
-            signal = "⏳ ESPERAR"
-            signal_class = "signal-wait"
-        else:                               # 0-24% = NO OPERAR
+        else:                               # 0-39% = NO OPERAR
             signal = "❌ NO OPERAR"
             signal_class = "signal-no"
 
@@ -147,7 +154,7 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
             <td class="criterion" title="RSI 15min: {rsi_15m:.1f} - {c2_intensity}"><span class="signal-{c2.lower().replace('🟢', 'excellent')}">{c2}</span></td>
             <td class="criterion" title="EMA Tendencia: {ema_diff:+.2f}% - {c3_intensity}"><span class="signal-{c3.lower().replace('🟢', 'excellent')}">{c3}</span></td>
             <td class="criterion" title="Volumen: {vol_ratio:.1f}x - {c4_intensity}"><span class="signal-{c4.lower().replace('🟢', 'excellent')}">{c4}</span></td>
-            <td class="criterion" title="Score: {score}/100 - {c5_intensity} (+{bonus_points}pts)"><span class="signal-{c5.lower().replace('🟢', 'excellent')}">{c5}</span></td>
+            <td class="criterion" title="Score: {score}/100 - {c5_intensity} (Nuevo sistema realista: Momentum+Volumen+Price Action+Volatilidad+Timing)"><span class="signal-{c5.lower().replace('🟢', 'excellent').replace('🔥', 'premium').replace('⚠️', 'regular')}">{c5}</span></td>
             <td class="criterion" title="Precio vs EMA: {price_ema_diff:+.2f}% - {c6_intensity}"><span class="signal-{c6.lower().replace('🟢', 'excellent')}">{c6}</span></td>
             <td class="criterion" title="Vela: {candle_change:+.2f}% - {c7_intensity}"><span class="signal-{c7.lower().replace('🟢', 'excellent')}">{c7}</span></td>
             <td class="criterion" title="Ruptura: {c8_intensity} (Vol:{vol_ratio:.1f}x + Vela:{candle_change:+.2f}%)"><span class="signal-{c8.lower().replace('🟢', 'excellent')}">{c8}</span></td>
@@ -263,11 +270,12 @@ body {{
 .score-label {{ font-size: 0.7rem; color: #94a3b8; }}
 .score-count {{ font-size: 0.65rem; color: #64748b; margin-top: 2px; }}
 .signal-explanation {{ font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }}
-.signal-premium {{ color: #8b5cf6; font-weight: 800; text-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }}
-.signal-strong {{ color: #22c55e; font-weight: 700; }}
-.signal-good {{ color: #3b82f6; font-weight: 600; }}
-.signal-weak {{ color: #f59e0b; font-weight: 600; }}
-.signal-wait {{ color: #64748b; }}
+.signal-premium {{ color: #dc2626; font-weight: 800; text-shadow: 0 0 15px rgba(220, 38, 38, 0.8); }}
+.signal-excellent {{ color: #ea580c; font-weight: 800; text-shadow: 0 0 10px rgba(234, 88, 12, 0.6); }}
+.signal-strong {{ color: #16a34a; font-weight: 700; }}
+.signal-good {{ color: #0ea5e9; font-weight: 600; }}
+.signal-regular {{ color: #ca8a04; font-weight: 600; }}
+.signal-weak {{ color: #6b7280; font-weight: 500; }}
 .signal-no {{ color: #ef4444; }}
 .reliability-bar {{
     position: relative; height: 16px; background: #334155;
