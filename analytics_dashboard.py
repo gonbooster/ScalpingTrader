@@ -117,11 +117,21 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             }}
             .refresh-btn:hover {{ transform: translateY(-2px); box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4); }}
             
-            .warning {{ 
+            .warning {{
                 background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
                 padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center;
                 color: #fecaca; font-weight: 600;
             }}
+
+            .auto-status {{
+                display: flex; gap: 20px; align-items: center; justify-content: center;
+                background: rgba(15, 23, 42, 0.6); padding: 10px 20px; border-radius: 8px;
+                border: 1px solid #334155; font-size: 0.9rem; color: #94a3b8;
+                margin-bottom: 20px;
+            }}
+            .auto-status span {{ display: flex; align-items: center; gap: 5px; }}
+            #autoRefresh {{ color: #22c55e; font-weight: 600; }}
+            .updating {{ color: #f59e0b !important; }}
             
             @media (max-width: 768px) {{
                 .charts-grid {{ grid-template-columns: 1fr; }}
@@ -140,8 +150,10 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             <div class="header">
                 <h1>📊 Trading Performance Analytics</h1>
                 <p>Sistema de análisis de rendimiento y optimización de señales</p>
-                <button class="refresh-btn" onclick="location.reload()">🔄 Actualizar Datos</button>
-                <button class="refresh-btn" onclick="forceEvaluate()" style="background: #f59e0b; margin-left: 10px;">⚡ Evaluar Señales</button>
+                <div class="auto-status">
+                    <span id="lastUpdate">Última actualización: Cargando...</span>
+                    <span id="autoRefresh">🔄 Auto-refresh: 30s</span>
+                </div>
             </div>
             
             <div class="warning">
@@ -266,47 +278,65 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
         </div>
         
         <script>
-            // Auto-refresh cada 5 minutos
-            setTimeout(function() {{ location.reload(); }}, 300000);
+            let refreshCountdown = 30;
+            let lastSignalCount = {performance_stats.get('total_signals', 0)};
 
-            // Actualizar timestamp cada segundo
-            setInterval(function() {{
-                var now = new Date();
-                var timeElements = document.querySelectorAll('.stat-trend');
-                // Actualizar solo el último elemento que es el timestamp
-            }}, 1000);
+            // Función para actualizar timestamp
+            function updateTimestamp() {{
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('es-ES');
+                document.getElementById('lastUpdate').innerHTML = '⏰ Última actualización: ' + timeStr;
+            }}
 
-            async function forceEvaluate() {{
-                const btn = event.target;
-                btn.disabled = true;
-                btn.innerHTML = '⏳ Evaluando...';
+            // Función para auto-evaluación cuando hay nuevas señales
+            async function autoEvaluateIfNeeded() {{
+                try {{
+                    const response = await fetch('/api/signal-count');
+                    const data = await response.json();
 
+                    if (data.count > lastSignalCount) {{
+                        console.log('🔍 Nuevas señales detectadas, evaluando automáticamente...');
+                        await autoEvaluate();
+                        lastSignalCount = data.count;
+                    }}
+                }} catch (error) {{
+                    console.log('Error verificando señales:', error);
+                }}
+            }}
+
+            // Función de auto-evaluación silenciosa
+            async function autoEvaluate() {{
                 try {{
                     const response = await fetch('/force-evaluate', {{
                         method: 'POST',
                         headers: {{ 'Content-Type': 'application/json' }}
                     }});
-
                     const result = await response.json();
-
-                    if (result.success) {{
-                        btn.innerHTML = '✅ Completado';
-                        alert('✅ Evaluación completada: ' + result.updated_count + ' señales actualizadas');
-                        setTimeout(function() {{ location.reload(); }}, 1000);
-                    }} else {{
-                        btn.innerHTML = '❌ Error';
-                        alert('❌ Error: ' + result.error);
+                    if (result.success && result.updated_count > 0) {{
+                        console.log('✅ Auto-evaluación: ' + result.updated_count + ' señales actualizadas');
                     }}
                 }} catch (error) {{
-                    btn.innerHTML = '❌ Error';
-                    alert('❌ Error de conexión: ' + error.message);
+                    console.log('Error en auto-evaluación:', error);
                 }}
-
-                setTimeout(function() {{
-                    btn.disabled = false;
-                    btn.innerHTML = '⚡ Evaluar Señales';
-                }}, 3000);
             }}
+
+            // Countdown para refresh
+            function updateCountdown() {{
+                document.getElementById('autoRefresh').innerHTML = '🔄 Próxima actualización: ' + refreshCountdown + 's';
+                refreshCountdown--;
+
+                if (refreshCountdown < 0) {{
+                    document.getElementById('autoRefresh').innerHTML = '🔄 Actualizando...';
+                    document.getElementById('autoRefresh').className = 'updating';
+                    location.reload();
+                }}
+            }}
+
+            // Inicializar
+            updateTimestamp();
+            setInterval(updateTimestamp, 1000);
+            setInterval(updateCountdown, 1000);
+            setInterval(autoEvaluateIfNeeded, 10000); // Verificar cada 10 segundos
         </script>
 
     </body>

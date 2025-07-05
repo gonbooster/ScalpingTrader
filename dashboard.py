@@ -296,12 +296,26 @@ body {{
 @media (max-width: 768px) {{
     .header-top {{ flex-direction: column; gap: 15px; text-align: center; }}
     .header-right {{ justify-content: center; }}
-    .header-nav {{ flex-wrap: wrap; justify-content: center; }}
-    .dashboard-main {{ padding: 0 15px 15px 15px; }}
-    .trading-table {{ font-size: 0.8rem; }}
-    .trading-table th, .trading-table td {{ padding: 8px 4px; }}
+    .header-nav {{ flex-wrap: wrap; justify-content: center; gap: 10px; }}
+    .nav-link {{ padding: 8px 12px; font-size: 0.9rem; }}
+    .dashboard-main {{ padding: 0 10px 15px 10px; }}
+    .trading-table {{ font-size: 0.75rem; }}
+    .trading-table th, .trading-table td {{ padding: 6px 3px; }}
+    .trading-signal {{ font-size: 0.7rem; padding: 4px 6px; }}
+    .reliability-bar {{ height: 16px; }}
+    .reliability-text {{ font-size: 0.6rem; }}
     .academic-notice {{ font-size: 0.8rem; padding: 10px 15px; }}
     .dashboard-title {{ font-size: 1.5rem; }}
+    .footer-stats {{ grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; }}
+    .stat-card {{ padding: 8px; }}
+}}
+
+@media (max-width: 480px) {{
+    .header-nav {{ flex-direction: column; gap: 5px; }}
+    .trading-table {{ font-size: 0.7rem; }}
+    .trading-table th:nth-child(n+4), .trading-table td:nth-child(n+4) {{ display: none; }}
+    .footer-stats {{ grid-template-columns: 1fr; }}
+    .stat-card {{ font-size: 0.7rem; }}
 }}
 </style>
 </head><body>

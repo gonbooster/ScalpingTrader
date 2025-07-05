@@ -387,6 +387,66 @@ def force_evaluate():
             'error': str(e)
         }), 500
 
+@app.route('/api/signal-count')
+def get_signal_count():
+    """Endpoint para obtener el número total de señales"""
+    try:
+        from performance_tracker import PerformanceTracker
+        tracker = PerformanceTracker()
+        stats = tracker.get_performance_stats()
+        return jsonify({
+            'count': stats.get('total_signals', 0),
+            'pending': stats.get('pending', 0)
+        })
+    except Exception as e:
+        return jsonify({
+            'count': 0,
+            'pending': 0,
+            'error': str(e)
+        }), 500
+
+@app.route('/admin/reset-data', methods=['POST'])
+def reset_data():
+    """Endpoint SEGURO para resetear datos - requiere token"""
+    try:
+        # Verificar token de seguridad
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or auth_header != 'Bearer SCALPING_RESET_2025':
+            return jsonify({
+                'success': False,
+                'error': 'Token de autorización inválido'
+            }), 401
+
+        # Resetear base de datos
+        from performance_tracker import PerformanceTracker
+        tracker = PerformanceTracker()
+
+        import sqlite3
+        conn = sqlite3.connect('trading_performance.db')
+        cursor = conn.cursor()
+
+        # Backup antes de borrar
+        cursor.execute('CREATE TABLE IF NOT EXISTS signals_backup AS SELECT * FROM signals')
+
+        # Limpiar tabla principal
+        cursor.execute('DELETE FROM signals')
+        conn.commit()
+        conn.close()
+
+        logger.info("🗑️ Base de datos reseteada por administrador")
+
+        return jsonify({
+            'success': True,
+            'message': 'Base de datos reseteada correctamente',
+            'backup_created': True
+        })
+    except Exception as e:
+        logger.error(f"❌ Error reseteando datos: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # Inicializar bot automáticamente
 init_trading_bot()
 
