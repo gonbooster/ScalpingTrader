@@ -318,6 +318,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                             <th>Tipo</th>
                             <th>Score</th>
                             <th>Precio</th>
+                            <th>TP/SL</th>
                             <th>Estado</th>
                             <th>Retorno</th>
                             <th>Tiempo</th>
@@ -409,16 +410,17 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
 
                 rows.forEach(row => {{
                     const cells = row.querySelectorAll('td');
-                    if (cells.length >= 8) {{
+                    if (cells.length >= 9) {{
                         allSignals.push({{
                             timestamp: cells[0].textContent.trim(),
                             symbol: cells[1].textContent.trim(),
                             type: cells[2].textContent.trim(),
                             score: parseInt(cells[3].textContent.replace(/[^0-9]/g, '')) || 0,
                             price: cells[4].textContent.trim(),
-                            status: cells[5].textContent.trim(),
-                            return: cells[6].textContent.trim(),
-                            time: cells[7].textContent.trim(),
+                            tpsl: cells[5].textContent.trim(),
+                            status: cells[6].textContent.trim(),
+                            return: cells[7].textContent.trim(),
+                            time: cells[8].textContent.trim(),
                             html: row.outerHTML
                         }});
                     }}
@@ -686,6 +688,26 @@ def generate_signals_table(recent_signals):
             except:
                 time_resolution = 0
 
+        # Formatear TP/SL
+        tp_price = safe_float(signal.get('tp_price', 0))
+        sl_price = safe_float(signal.get('sl_price', 0))
+        entry_price = safe_float(signal.get('entry_price', 0))
+
+        # Calcular % de TP y SL
+        if entry_price > 0:
+            tp_percent = ((tp_price - entry_price) / entry_price) * 100 if tp_price > 0 else 0
+            sl_percent = ((sl_price - entry_price) / entry_price) * 100 if sl_price > 0 else 0
+
+            # Para SELL, invertir los cálculos
+            if signal.get('signal_type', '').lower() == 'sell':
+                tp_percent = -tp_percent
+                sl_percent = -sl_percent
+        else:
+            tp_percent = 0
+            sl_percent = 0
+
+        tp_sl_text = f"TP: {tp_percent:+.1f}%<br>SL: {sl_percent:+.1f}%" if tp_price > 0 and sl_price > 0 else "N/A"
+
         html += f"""
         <tr>
             <td>{signal.get('timestamp', '')[:16]}</td>
@@ -693,6 +715,7 @@ def generate_signals_table(recent_signals):
             <td>{signal.get('signal_type', '').upper()}</td>
             <td>{safe_float(signal.get('score', 0)):.0f}/100</td>
             <td>${safe_float(signal.get('entry_price', 0)):,.2f}</td>
+            <td style="font-size: 0.85rem; line-height: 1.2;">{tp_sl_text}</td>
             <td class="{status_class}"><strong>{result_text}</strong></td>
             <td class="{status_class}">{actual_return:+.2f}%</td>
             <td>{int(time_resolution)} min</td>
@@ -728,6 +751,8 @@ def get_analytics_data():
             'signal_type': signal[3],
             'entry_price': safe_float(signal[4]),
             'score': safe_float(signal[5]),
+            'tp_price': safe_float(signal[15]),  # Take Profit
+            'sl_price': safe_float(signal[16]),  # Stop Loss
             'result': signal[18] if signal[18] is not None else None,
             'actual_return': safe_float(signal[21]),
             'time_to_resolution': safe_float(signal[22]),

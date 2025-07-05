@@ -79,7 +79,18 @@ def trading_loop():
                 # Analizar señales de trading
                 signals_sent = analyze_trading_signals(market_data)
                 signal_count += signals_sent
-                
+
+                # Evaluar señales pendientes automáticamente cada 3 ciclos
+                if cycle_count % 3 == 0:
+                    try:
+                        from performance_tracker import PerformanceTracker
+                        tracker = PerformanceTracker()
+                        updated = tracker.update_pending_signals()
+                        if updated > 0:
+                            logger.info(f"📊 Evaluadas {updated} señales pendientes automáticamente")
+                    except Exception as e:
+                        logger.error(f"❌ Error evaluando señales pendientes: {e}")
+
                 logger.info(f"✅ Ciclo {cycle_count} completado - {signals_sent} señales enviadas")
             else:
                 logger.error(f"❌ Error en ciclo {cycle_count}")
