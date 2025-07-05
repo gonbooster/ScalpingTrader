@@ -175,36 +175,36 @@ def calculate_realistic_scalping_score(data):
     rsi_5m = data.get("rsi_5m", 50)
     rsi_15m = data.get("rsi_15m", 50)
 
-    # Momentum ascendente (aceleración de precio) - MÁS GENEROSO
-    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 52:  # Aceleración alcista fuerte
+    # Momentum ascendente (aceleración de precio) - EQUILIBRADO PARA CALIDAD
+    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 50:  # Aceleración alcista fuerte
+        score += 30
+    elif rsi_1m > rsi_5m and rsi_1m > 45:  # Momentum positivo
+        score += 25
+    elif rsi_1m > 40:  # Momentum básico
         score += 20
-    elif rsi_1m > rsi_5m and rsi_1m > 50:  # Momentum positivo
-        score += 15
-    elif rsi_1m > 48:  # Momentum básico
+    else:  # Sin momentum
         score += 10
 
-    # RSI en zona óptima para scalping - MÁS GENEROSO
-    if 40 <= rsi_1m <= 70:  # Zona óptima ampliada
-        score += 15
-    elif 35 <= rsi_1m <= 75:  # Zona buena
-        score += 12
-    elif 30 <= rsi_1m <= 80:  # Zona aceptable
-        score += 8
+    # RSI en zona óptima para scalping - EQUILIBRADO
+    if 30 <= rsi_1m <= 70:  # Zona óptima
+        score += 5
+    else:  # Fuera de zona
+        score += 0
 
     # 2. 🔊 VOLUMEN INTELIGENTE (30%) - Confirmación de movimiento
     volume_ratio = data.get("volume", 1) / max(data.get("vol_avg", 1), 1)
 
-    # Volumen explosivo (señal fuerte) - MÁS GENEROSO
+    # Volumen explosivo (señal fuerte) - EQUILIBRADO PARA CALIDAD
     if volume_ratio > 2.0:  # Volumen excepcional
         score += 30
     elif volume_ratio > 1.5:  # Volumen muy alto
         score += 25
-    elif volume_ratio > 1.3:  # Volumen alto
+    elif volume_ratio > 1.2:  # Volumen alto
         score += 20
-    elif volume_ratio > 1.1:  # Volumen moderado
+    elif volume_ratio > 1.0:  # Volumen moderado
         score += 15
-    elif volume_ratio > 0.9:  # Volumen normal
-        score += 10
+    else:  # Volumen bajo
+        score += 5
 
     # 3. 🎯 PRICE ACTION (25%) - Confirmación técnica
     ema_fast = data.get("ema_fast", 0)
@@ -216,16 +216,14 @@ def calculate_realistic_scalping_score(data):
     ema_alignment = ema_fast > ema_slow if ema_fast and ema_slow else False
     price_vs_ema = price > ema_fast if price and ema_fast else False
 
-    if ema_alignment and price_vs_ema and candle_change > 0.2:  # Setup perfecto
+    if ema_alignment and price_vs_ema and candle_change > 0.1:  # Setup perfecto
         score += 25
-    elif ema_alignment and price_vs_ema and candle_change > 0.1:  # Setup bueno
+    elif ema_alignment and price_vs_ema:  # Setup bueno
         score += 20
-    elif ema_alignment and price_vs_ema:  # Setup básico
+    elif ema_alignment or price_vs_ema:  # Setup básico
         score += 15
-    elif ema_alignment or price_vs_ema:  # Setup parcial
-        score += 10
     else:  # Sin alineación
-        score += 5
+        score += 10
 
     # 4. 📊 VOLATILIDAD CONTROLADA (10%) - Risk management
     atr_value = data.get("atr", 0)

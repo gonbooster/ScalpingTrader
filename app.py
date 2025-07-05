@@ -224,13 +224,13 @@ def test_email():
 @app.route("/start")
 def start_bot():
     """Endpoint para iniciar el bot"""
-    global bot_running
-    
+    global bot_running, bot_thread
+
     if not bot_running:
         # Iniciar bot en hilo separado
         bot_thread = threading.Thread(target=trading_loop, daemon=True)
         bot_thread.start()
-        
+
         logger.info("🚀 Bot iniciado desde endpoint")
         return jsonify({
             "status": "success",

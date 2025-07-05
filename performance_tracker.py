@@ -575,7 +575,7 @@ class PerformanceTracker:
                 SUM(CASE WHEN result LIKE 'WIN%' THEN actual_return ELSE 0 END) as total_profit,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN actual_return ELSE 0 END) as total_loss
             FROM signals
-            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 85
+            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 80
         '''.format(days))
 
         basic_stats = cursor.fetchone()
@@ -584,9 +584,9 @@ class PerformanceTracker:
         cursor.execute('''
             SELECT
                 CASE
-                    WHEN score >= 92 THEN 'PREMIUM (92-100)'
-                    WHEN score >= 85 THEN 'EXCELENTE (85-91)'
-                    ELSE 'NO ANALIZADO (<85)'
+                    WHEN score >= 90 THEN 'ULTRA-PREMIUM (90-100)'
+                    WHEN score >= 80 THEN 'PREMIUM (80-89)'
+                    ELSE 'NO ANALIZADO (<80)'
                 END as score_range,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
@@ -594,7 +594,7 @@ class PerformanceTracker:
                 MAX(actual_return) as best_return,
                 MIN(actual_return) as worst_return
             FROM signals
-            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 85
+            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 80
             GROUP BY score_range
             ORDER BY MIN(score) DESC
         '''.format(days))

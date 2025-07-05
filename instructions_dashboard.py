@@ -421,7 +421,7 @@ def generate_instructions_dashboard():
                     <strong>Cada criterio cumplido aumenta la probabilidad de éxito de la operación.</strong></p>
 
                     <p><strong>📊 Progress Bar:</strong> Muestra (criterios cumplidos / 8) × 100 + bonus por score alto (≥80)</p>
-                    <p><strong>🎯 Señales:</strong> Solo se envían emails para señales BUY con Score ≥85 (EXCELENTES)</p>
+                    <p><strong>🎯 Señales:</strong> Solo se envían emails para señales BUY con Score ≥80 (PREMIUM)</p>
                 </div>
 
                 <h3>📋 Los 8 Criterios Reales del Sistema:</h3>
@@ -480,17 +480,17 @@ def generate_instructions_dashboard():
                     <h3>🎯 ¿Cuándo aparecen las señales? (NUEVO SISTEMA)</h3>
                     <div class="score-ranges">
                         <div class="score-range score-excellent">
-                            <div>🔥 Score ≥ 92</div>
-                            <div>PREMIUM</div>
-                            <div>Máxima probabilidad + Email</div>
+                            <div>🔥 Score ≥ 90</div>
+                            <div>ULTRA-PREMIUM</div>
+                            <div>Máxima probabilidad + Email sin límites</div>
                         </div>
                         <div class="score-range score-excellent">
-                            <div>⭐ Score 85-91</div>
-                            <div>EXCELENTE</div>
+                            <div>⭐ Score 80-89</div>
+                            <div>PREMIUM</div>
                             <div>Alta probabilidad + Email</div>
                         </div>
                         <div class="score-range score-good">
-                            <div>✅ Score 80-89</div>
+                            <div>✅ Score 70-79</div>
                             <div>FUERTE</div>
                             <div>Buena probabilidad - Sin email</div>
                         </div>
@@ -526,8 +526,8 @@ def generate_instructions_dashboard():
                     </ul>
 
                     <div style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #22c55e; padding: 15px; margin: 20px 0; border-radius: 8px;">
-                        <strong>🚀 SISTEMA OPTIMIZADO:</strong> Algoritmo ajustado para máxima precisión en señales de email.
-                        Solo señales con Score ≥85 tienen alta probabilidad de éxito y reciben emails.
+                        <strong>🚀 SISTEMA PROFESIONAL:</strong> Algoritmo ajustado para máxima precisión en señales de email.
+                        Solo señales con Score ≥80 tienen alta probabilidad de éxito y reciben emails.
                     </div>
                 </div>
 
@@ -632,7 +632,7 @@ def generate_instructions_dashboard():
                         <div class="flow-number">3</div>
                         <div>
                             <strong>🎯 Revisar Score</strong><br>
-                            Solo considera señales con score 85+ (EXCELENTE) o 92+ (PREMIUM). Evita scores menores a 85.
+                            Solo considera señales con score 80+ (PREMIUM) o 90+ (ULTRA-PREMIUM). Evita scores menores a 80.
                         </div>
                     </div>
 
@@ -640,7 +640,7 @@ def generate_instructions_dashboard():
                         <div class="flow-number">4</div>
                         <div>
                             <strong>📧 Esperar Email</strong><br>
-                            El sistema solo envía emails para señales EXCELENTES (85+ score). Esto garantiza máxima precisión.
+                            El sistema solo envía emails para señales PREMIUM (80+ score). Esto garantiza máxima precisión profesional.
                         </div>
                     </div>
 

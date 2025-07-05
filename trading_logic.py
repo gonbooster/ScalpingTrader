@@ -130,8 +130,8 @@ class TradingLogic:
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos BUY: 4 de 8 condiciones principales + distancia OK (más realista)
-        required_main = 4
+        # Requerimientos BUY: 5 de 8 condiciones principales + distancia OK (MÁXIMA PRECISIÓN)
+        required_main = 5
         main_valid = main_fulfilled >= required_main
 
         logger.info(f"🔍 BUY {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
@@ -167,8 +167,8 @@ class TradingLogic:
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos SELL: 4 de 8 condiciones principales + distancia OK (más realista)
-        required_main = 4
+        # Requerimientos SELL: 6 de 8 condiciones principales + distancia OK (MÁXIMA PRECISIÓN)
+        required_main = 6
         main_valid = main_fulfilled >= required_main
 
         logger.info(f"🔍 SELL {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
@@ -194,17 +194,17 @@ class TradingLogic:
 
             # Solo verificar límites de email si vamos a enviar email
             if send_email:
-                # SOLO ENVIAR EMAILS PARA SEÑALES EXCELENTES (85+)
-                if data["score"] < 85:
-                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥85)")
+                # SOLO ENVIAR EMAILS PARA SEÑALES PREMIUM (80+)
+                if data["score"] < 80:
+                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥80)")
                     send_email = False  # Registrar pero no enviar email
 
                 # Verificar límite diario de emails para señales excelentes
-                if send_email and data["score"] < 92 and not self.check_daily_email_limit():
+                if send_email and data["score"] < 90 and not self.check_daily_email_limit():
                     logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails}) - Score: {data['score']}")
                     send_email = False
-                elif send_email and data["score"] >= 92:
-                    logger.info(f"🔥 SEÑAL PREMIUM (Score: {data['score']}) - Bypassing daily limit")
+                elif send_email and data["score"] >= 90:
+                    logger.info(f"🔥 SEÑAL ULTRA-PREMIUM (Score: {data['score']}) - Bypassing daily limit")
             
             # Calcular price targets
             price_targets = calculate_price_targets(
