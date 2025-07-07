@@ -566,7 +566,7 @@ class PerformanceTracker:
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN 1 ELSE 0 END) as losses,
                 SUM(CASE WHEN result = 'EXPIRED' THEN 1 ELSE 0 END) as expired,
-                SUM(CASE WHEN result IS NULL OR result = 'None' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN result IS NULL OR result = 'None' OR result = '' THEN 1 ELSE 0 END) as pending,
                 AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
                 AVG(score) as avg_score,
                 AVG(CASE WHEN time_to_resolution IS NOT NULL THEN time_to_resolution END) as avg_time_minutes,

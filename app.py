@@ -300,9 +300,18 @@ def analytics():
     """Dashboard de análisis de rendimiento (PRIVADO)"""
     try:
         from analytics_dashboard import get_analytics_data, generate_analytics_dashboard
+        from flask import make_response
 
         performance_stats, recent_signals, market_trends = get_analytics_data()
-        return generate_analytics_dashboard(performance_stats, recent_signals, market_trends)
+        dashboard_html = generate_analytics_dashboard(performance_stats, recent_signals, market_trends)
+
+        # Crear respuesta con headers anti-cache
+        response = make_response(dashboard_html)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+        return response
 
     except ImportError as e:
         logger.error(f"ImportError en analytics: {e}")

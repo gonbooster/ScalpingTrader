@@ -293,3 +293,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **⚡ Built with Python, Flask, and professional trading strategies**
 
 **🚀 Deploy in minutes, trade in seconds**
+
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/admin/reset/admin" -Method POST
