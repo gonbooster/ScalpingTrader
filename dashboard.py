@@ -201,6 +201,7 @@ body {{
 }}
 .header-right {{
     display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    justify-content: flex-end;
 }}
 .refresh-indicator {{
     display: flex; align-items: center; gap: 8px;
@@ -219,20 +220,26 @@ body {{
     50% {{ opacity: 0.5; transform: scale(1.2); }}
 }}
 .header-nav {{
-    display: flex; gap: 15px;
+    display: flex; gap: 15px; align-items: center;
 }}
 .nav-link {{
-    color: #94a3b8; text-decoration: none; padding: 8px 16px;
-    border-radius: 8px; font-weight: 500; font-size: 0.9rem;
+    color: #94a3b8; text-decoration: none; padding: 10px 18px;
+    border-radius: 12px; font-weight: 600; font-size: 0.9rem;
     transition: all 0.3s ease; border: 1px solid transparent;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(10px);
+    white-space: nowrap;
 }}
 .nav-link:hover {{
-    background: rgba(148, 163, 184, 0.1); color: #f1f5f9;
-    border-color: rgba(148, 163, 184, 0.3);
+    background: rgba(148, 163, 184, 0.15); color: #f1f5f9;
+    border-color: rgba(148, 163, 184, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }}
 .nav-link.active {{
-    background: rgba(34, 197, 94, 0.2); color: #22c55e;
-    border-color: rgba(34, 197, 94, 0.3);
+    background: rgba(34, 197, 94, 0.25); color: #22c55e;
+    border-color: rgba(34, 197, 94, 0.4);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
 }}
 .academic-notice {{
     background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1));
@@ -281,7 +288,7 @@ body {{
     .scroll-indicator {{ display: block; }}
 }}
 .trading-table {{
-    width: 100%; min-width: 1200px; background: #1e293b;
+    width: 100%; min-width: 1000px; background: #1e293b;
     border-collapse: collapse;
 }}
 .trading-table th, .trading-table td {{
@@ -340,13 +347,28 @@ body {{
     transform: translate(-50%, -50%); max-width: 300px;
 }}
 @media (max-width: 768px) {{
-    .header-top {{ flex-direction: column; gap: 15px; text-align: center; }}
-    .header-right {{ justify-content: center; }}
-    .header-nav {{ flex-wrap: wrap; justify-content: center; gap: 10px; }}
-    .nav-link {{ padding: 8px 12px; font-size: 0.9rem; }}
+    .header-top {{
+        flex-direction: column; gap: 15px; text-align: center;
+        align-items: center;
+    }}
+    .header-right {{
+        justify-content: center; width: 100%;
+        flex-direction: column; gap: 15px;
+    }}
+    .header-nav {{
+        flex-wrap: wrap; justify-content: center; gap: 10px;
+        width: 100%;
+    }}
+    .nav-link {{
+        padding: 10px 16px; font-size: 0.9rem;
+        min-width: 120px; text-align: center;
+    }}
+    .refresh-indicator {{
+        order: -1; margin-bottom: 5px;
+    }}
     .dashboard-main {{ padding: 0 10px 15px 10px; }}
-    .trading-table {{ font-size: 0.75rem; }}
-    .trading-table th, .trading-table td {{ padding: 6px 3px; }}
+    .trading-table {{ font-size: 0.85rem; min-width: 900px; }}
+    .trading-table th, .trading-table td {{ padding: 10px 8px; }}
     .trading-signal {{ font-size: 0.7rem; padding: 4px 6px; }}
     .reliability-bar {{ height: 16px; }}
     .reliability-text {{ font-size: 0.6rem; }}
@@ -357,9 +379,27 @@ body {{
 }}
 
 @media (max-width: 480px) {{
-    .header-nav {{ flex-direction: column; gap: 5px; }}
-    .trading-table {{ font-size: 0.7rem; }}
-    .trading-table th:nth-child(n+4), .trading-table td:nth-child(n+4) {{ display: none; }}
+    .header-nav {{
+        flex-direction: column; gap: 8px;
+        align-items: center; width: 100%;
+    }}
+    .nav-link {{
+        width: 90%; max-width: 200px;
+        padding: 12px 20px; font-size: 1rem;
+        text-align: center;
+    }}
+    .refresh-indicator {{
+        font-size: 0.8rem; padding: 6px 10px;
+    }}
+    .dashboard-title {{
+        font-size: 1.3rem; margin-bottom: 10px;
+    }}
+    .academic-notice {{
+        font-size: 0.75rem; padding: 8px 12px;
+        text-align: center;
+    }}
+    .trading-table {{ font-size: 0.8rem; min-width: 800px; }}
+    .trading-table th, .trading-table td {{ padding: 8px 6px; }}
     .footer-stats {{ grid-template-columns: 1fr; }}
     .stat-card {{ font-size: 0.7rem; }}
 }}
