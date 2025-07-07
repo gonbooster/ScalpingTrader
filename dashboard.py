@@ -243,9 +243,46 @@ body {{
 .dashboard-main {{
     padding: 0 25px 25px 25px; max-width: 1400px; margin: 0 auto;
 }}
+.table-container {{
+    width: 100%; overflow-x: auto; margin: 20px 0;
+    border-radius: 12px; background: #1e293b;
+    /* Scroll horizontal suave en móviles */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #64748b #1e293b;
+}}
+.table-container::-webkit-scrollbar {{
+    height: 8px;
+}}
+.table-container::-webkit-scrollbar-track {{
+    background: #1e293b;
+}}
+.table-container::-webkit-scrollbar-thumb {{
+    background: #64748b;
+    border-radius: 4px;
+}}
+
+/* Indicador de scroll para móviles */
+.scroll-indicator {{
+    display: none;
+    text-align: center;
+    padding: 8px;
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    font-size: 0.8rem;
+    border-bottom: 1px solid #334155;
+    animation: pulse 2s infinite;
+}}
+@keyframes pulse {{
+    0%, 100% {{ opacity: 0.6; }}
+    50% {{ opacity: 1; }}
+}}
+@media (max-width: 768px) {{
+    .scroll-indicator {{ display: block; }}
+}}
 .trading-table {{
-    width: 100%; background: #1e293b; border-radius: 12px;
-    border-collapse: collapse; overflow: hidden;
+    width: 100%; min-width: 1200px; background: #1e293b;
+    border-collapse: collapse;
 }}
 .trading-table th, .trading-table td {{
     padding: 12px 8px; text-align: center; border-bottom: 1px solid #334155;
@@ -351,6 +388,10 @@ body {{
     </div>
 </header>
 <main class="dashboard-main">
+<div class="table-container" id="tableContainer">
+<div class="scroll-indicator" id="scrollIndicator">
+    ← Desliza para ver todos los criterios →
+</div>
 <table class="trading-table">
 <thead>
 <tr>
@@ -371,6 +412,7 @@ body {{
 {crypto_rows}
 </tbody>
 </table>
+</div>
 </main>
 <script>
 // Indicador de refresh
@@ -408,6 +450,28 @@ window.addEventListener('load', () => {{
     showRefreshIndicator();
     setTimeout(hideRefreshIndicator, 2000);
 }});
+
+// Manejo del indicador de scroll
+const tableContainer = document.getElementById('tableContainer');
+const scrollIndicator = document.getElementById('scrollIndicator');
+
+if (tableContainer && scrollIndicator) {{
+    let hasScrolled = false;
+
+    tableContainer.addEventListener('scroll', function() {{
+        if (!hasScrolled) {{
+            hasScrolled = true;
+            scrollIndicator.style.display = 'none';
+        }}
+    }});
+
+    // Ocultar indicador después de 5 segundos
+    setTimeout(() => {{
+        if (scrollIndicator) {{
+            scrollIndicator.style.display = 'none';
+        }}
+    }}, 5000);
+}}
 </script>
 
 <!-- Badge de versión automático -->

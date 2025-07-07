@@ -83,14 +83,167 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             }}
             .score-range {{ font-weight: 600; }}
             .score-stats {{ display: flex; gap: 20px; font-size: 0.9rem; }}
+
+            /* Estilos mejorados para análisis por símbolo */
+            .symbol-breakdown-item {{
+                background: rgba(15, 23, 42, 0.6);
+                border: 1px solid #334155;
+                border-radius: 12px;
+                padding: 16px;
+                margin-bottom: 16px;
+            }}
+            .symbol-header {{
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid #334155;
+            }}
+            .symbol-name {{
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #f1f5f9;
+            }}
+            .symbol-winrate {{
+                font-size: 1rem;
+                font-weight: 600;
+                padding: 4px 12px;
+                border-radius: 20px;
+                background: rgba(255, 255, 255, 0.1);
+            }}
+            .symbol-stats {{
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }}
+            .win-loss-container {{
+                display: flex;
+                gap: 16px;
+                justify-content: center;
+            }}
+            .win-loss-item {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 12px 20px;
+                border-radius: 12px;
+                min-width: 80px;
+            }}
+            .win-loss-item.win {{
+                background: rgba(34, 197, 94, 0.15);
+                border: 1px solid rgba(34, 197, 94, 0.3);
+            }}
+            .win-loss-item.loss {{
+                background: rgba(239, 68, 68, 0.15);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+            }}
+            .win-loss-number {{
+                font-size: 1.5rem;
+                font-weight: 800;
+                margin-bottom: 4px;
+            }}
+            .win-loss-item.win .win-loss-number {{
+                color: #22c55e;
+            }}
+            .win-loss-item.loss .win-loss-number {{
+                color: #ef4444;
+            }}
+            .win-loss-label {{
+                font-size: 0.8rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                opacity: 0.9;
+            }}
+            .symbol-metrics {{
+                display: flex;
+                justify-content: space-around;
+                gap: 12px;
+                padding-top: 8px;
+                border-top: 1px solid #334155;
+            }}
+            .metric {{
+                font-size: 0.85rem;
+                font-weight: 500;
+                text-align: center;
+            }}
+            .metric.return {{
+                font-weight: 700;
+            }}
+
+            /* Responsive para análisis por símbolo */
+            @media (max-width: 768px) {{
+                .symbol-breakdown-item {{
+                    padding: 12px;
+                }}
+                .win-loss-container {{
+                    gap: 12px;
+                }}
+                .win-loss-item {{
+                    padding: 8px 12px;
+                    min-width: 60px;
+                }}
+                .win-loss-number {{
+                    font-size: 1.2rem;
+                }}
+                .symbol-metrics {{
+                    flex-direction: column;
+                    gap: 8px;
+                }}
+            }}
             
-            .signals-table {{ width: 100%; border-collapse: collapse; margin-top: 20px; }}
+            /* Contenedor con scroll horizontal para móviles */
+            .table-container {{
+                width: 100%; overflow-x: auto; margin-top: 20px;
+                border-radius: 12px; background: rgba(15, 23, 42, 0.8);
+                /* Scroll horizontal suave en móviles */
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+                scrollbar-color: #64748b rgba(15, 23, 42, 0.8);
+            }}
+            .table-container::-webkit-scrollbar {{
+                height: 8px;
+            }}
+            .table-container::-webkit-scrollbar-track {{
+                background: rgba(15, 23, 42, 0.8);
+            }}
+            .table-container::-webkit-scrollbar-thumb {{
+                background: #64748b;
+                border-radius: 4px;
+            }}
+
+            /* Indicador de scroll para móviles */
+            .scroll-indicator {{
+                display: none;
+                text-align: center;
+                padding: 8px;
+                background: rgba(59, 130, 246, 0.1);
+                color: #60a5fa;
+                font-size: 0.8rem;
+                border-bottom: 1px solid #334155;
+                animation: pulse 2s infinite;
+            }}
+            @keyframes pulse {{
+                0%, 100% {{ opacity: 0.6; }}
+                50% {{ opacity: 1; }}
+            }}
+            @media (max-width: 768px) {{
+                .scroll-indicator {{ display: block; }}
+            }}
+
+            .signals-table {{
+                width: 100%; min-width: 1000px; border-collapse: collapse;
+                background: transparent;
+            }}
             .signals-table th, .signals-table td {{
                 padding: 12px; text-align: left; border-bottom: 1px solid #334155;
+                white-space: nowrap;
             }}
             .signals-table th {{
-                background: rgba(15, 23, 42, 0.8); color: #94a3b8; font-weight: 600;
+                background: rgba(15, 23, 42, 0.9); color: #94a3b8; font-weight: 600;
                 text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;
+                position: sticky; top: 0; z-index: 10;
             }}
             .signals-table tr:hover {{ background: rgba(15, 23, 42, 0.4); }}
 
@@ -100,16 +253,14 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             .signals-table th:nth-child(7) {{ color: #6366f1; }} /* TP/SL % */
             .signals-table td:nth-child(5) {{ font-weight: 600; color: #fbbf24; }} /* Entrada */
 
-            /* Responsive table */
-            .table-container {{ overflow-x: auto; }}
+            /* Responsive mejorado - mantener scroll en lugar de ocultar columnas */
             @media (max-width: 768px) {{
-                .signals-table {{ font-size: 0.8rem; }}
-                .signals-table th, .signals-table td {{ padding: 8px 4px; }}
-                .signals-table th:nth-child(n+6), .signals-table td:nth-child(n+6) {{ display: none; }}
+                .signals-table {{ font-size: 0.85rem; min-width: 900px; }}
+                .signals-table th, .signals-table td {{ padding: 10px 8px; }}
             }}
             @media (max-width: 480px) {{
-                .signals-table th:nth-child(n+4), .signals-table td:nth-child(n+4) {{ display: none; }}
-                .signals-table th, .signals-table td {{ padding: 6px 2px; font-size: 0.7rem; }}
+                .signals-table {{ font-size: 0.8rem; min-width: 800px; }}
+                .signals-table th, .signals-table td {{ padding: 8px 6px; }}
             }}
             
             .status-win {{ color: #22c55e; font-weight: 600; }}
@@ -315,7 +466,10 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     </button>
                 </div>
 
-                <div class="table-container">
+                <div class="table-container" id="tableContainer">
+                    <div class="scroll-indicator" id="scrollIndicator">
+                        ← Desliza para ver más columnas →
+                    </div>
                     <table class="signals-table">
                     <thead>
                         <tr>
@@ -551,6 +705,28 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     updatePagination();
                 }});
             }}, 1000);
+
+            // Manejo del indicador de scroll
+            const tableContainer = document.getElementById('tableContainer');
+            const scrollIndicator = document.getElementById('scrollIndicator');
+
+            if (tableContainer && scrollIndicator) {{
+                let hasScrolled = false;
+
+                tableContainer.addEventListener('scroll', function() {{
+                    if (!hasScrolled) {{
+                        hasScrolled = true;
+                        scrollIndicator.style.display = 'none';
+                    }}
+                }});
+
+                // Ocultar indicador después de 5 segundos
+                setTimeout(() => {{
+                    if (scrollIndicator) {{
+                        scrollIndicator.style.display = 'none';
+                    }}
+                }}, 5000);
+            }}
         </script>
 
     </body>
@@ -581,26 +757,49 @@ def generate_score_breakdown(score_breakdown):
     return html
 
 def generate_symbol_breakdown(symbol_breakdown):
-    """Genera el desglose de rendimiento por símbolo"""
+    """Genera el desglose de rendimiento por símbolo con wins/losses claros"""
     if not symbol_breakdown:
         return "<div class='score-item'><span>No hay datos suficientes</span></div>"
 
     html = ""
     for item in symbol_breakdown:
         win_rate = safe_float(item.get('win_rate', 0))
+        total_signals = item.get('count', 0)
+        wins = item.get('wins', 0)
+        losses = item.get('losses', 0)
+
+        # Si no tenemos wins/losses, calcularlos del win_rate
+        if wins == 0 and losses == 0 and total_signals > 0:
+            wins = int(total_signals * win_rate / 100)
+            losses = total_signals - wins
+
         color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
 
         # Emoji por símbolo
         emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item.get('symbol', ''), "💰")
 
         html += f"""
-        <div class="score-item">
-            <span class="score-range">{emoji} {item.get('symbol', 'N/A')}</span>
-            <div class="score-stats">
-                <span class="{color_class}">{win_rate:.1f}% WR</span>
-                <span>{item.get('count', 0)} señales</span>
-                <span>{safe_float(item.get('avg_return', 0)):+.2f}%</span>
-                <span>📊 {safe_float(item.get('avg_score', 0)):.0f}/100</span>
+        <div class="symbol-breakdown-item">
+            <div class="symbol-header">
+                <span class="symbol-name">{emoji} {item.get('symbol', 'N/A')}</span>
+                <span class="symbol-winrate {color_class}">{win_rate:.1f}% WR</span>
+            </div>
+            <div class="symbol-stats">
+                <div class="win-loss-container">
+                    <div class="win-loss-item win">
+                        <span class="win-loss-number">{wins}</span>
+                        <span class="win-loss-label">✅ Aciertos</span>
+                    </div>
+                    <div class="win-loss-item loss">
+                        <span class="win-loss-number">{losses}</span>
+                        <span class="win-loss-label">❌ Fallos</span>
+                    </div>
+                </div>
+                <div class="symbol-metrics">
+                    <span class="metric">📊 {total_signals} señales</span>
+                    <span class="metric return {color_class}">{safe_float(item.get('avg_return', 0)):+.2f}%</span>
+                    <span class="metric">🎯 {safe_float(item.get('avg_score', 0)):.0f}/100</span>
+                </div>
             </div>
         </div>
         """
@@ -677,8 +876,17 @@ def generate_signals_table(recent_signals):
                 result_text = f'❓ {result_raw}'
                 status_class = 'status-pending'
 
-        # Calcular retorno real
-        actual_return = safe_float(signal.get('actual_return', 0))
+        # Calcular retorno real - CORREGIR si contiene precios en lugar de %
+        actual_return_raw = safe_float(signal.get('actual_return', 0))
+        entry_price = safe_float(signal.get('entry_price', 0))
+
+        # Si actual_return es muy grande (>100), probablemente es un precio, no un %
+        if actual_return_raw > 100 and entry_price > 0:
+            # Calcular el % real basado en el precio actual vs precio de entrada
+            # Esto es una aproximación ya que no tenemos el precio de salida real
+            actual_return = 0.0  # Mostrar 0% hasta que se evalúe correctamente
+        else:
+            actual_return = actual_return_raw
 
         # Calcular tiempo transcurrido más realista
         time_resolution = safe_float(signal.get('time_to_resolution', 0))

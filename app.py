@@ -85,7 +85,7 @@ def trading_loop():
                     try:
                         from performance_tracker import PerformanceTracker
                         tracker = PerformanceTracker()
-                        updated = tracker.update_pending_signals()
+                        updated = tracker.force_evaluate_all_pending()
                         if updated > 0:
                             logger.info(f"📊 Evaluadas {updated} señales pendientes automáticamente")
                     except Exception as e:
