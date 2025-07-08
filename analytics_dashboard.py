@@ -26,6 +26,9 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="0">
         <title>📊 Trading Analytics - Performance Dashboard</title>
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -957,40 +960,30 @@ def generate_signals_table(recent_signals):
 def get_analytics_data():
     """Obtiene datos para el dashboard de analytics"""
     from performance_tracker import performance_tracker
-    
-    # Obtener estadísticas de rendimiento
+
+    # USAR LA MISMA FUENTE PARA TODO - performance_tracker
     performance_stats = performance_tracker.get_performance_stats(30)
-    
-    # Obtener señales recientes directamente de la base de datos
-    conn = sqlite3.connect(performance_tracker.db_path)
-    cursor = conn.cursor()
 
-    cursor.execute('''
-        SELECT * FROM signals
-        ORDER BY timestamp DESC
-        LIMIT 50
-    ''')
-
-    signals_raw = cursor.fetchall()
+    # Obtener señales recientes usando el mismo método que las stats
+    recent_signals_data = performance_tracker.get_recent_signals(50)
     recent_signals = []
 
-    for signal in signals_raw:
+    # Convertir el formato de recent_signals_data al formato esperado
+    for signal in recent_signals_data:
         recent_signals.append({
-            'id': signal[0],
-            'timestamp': signal[1],
-            'symbol': signal[2],
-            'signal_type': signal[3],
-            'entry_price': safe_float(signal[4]),
-            'score': safe_float(signal[5]),
-            'tp_price': safe_float(signal[15]),  # Take Profit
-            'sl_price': safe_float(signal[16]),  # Stop Loss
-            'result': signal[18] if signal[18] is not None else None,
-            'actual_return': safe_float(signal[21]),
-            'time_to_resolution': safe_float(signal[22]),
-            'today': signal[1][:10] == datetime.now().strftime('%Y-%m-%d') if signal[1] else False
+            'id': signal.get('id'),
+            'timestamp': signal.get('timestamp'),
+            'symbol': signal.get('symbol'),
+            'signal_type': signal.get('signal_type'),
+            'entry_price': signal.get('entry_price', 0),
+            'score': signal.get('score', 0),
+            'tp_price': signal.get('tp_price'),
+            'sl_price': signal.get('sl_price'),
+            'result': signal.get('result'),
+            'actual_return': signal.get('actual_return', 0),
+            'time_to_resolution': signal.get('time_to_resolution', 0),
+            'today': signal.get('today', False)
         })
-
-    conn.close()
     
     # Tendencias de mercado (placeholder)
     market_trends = {}

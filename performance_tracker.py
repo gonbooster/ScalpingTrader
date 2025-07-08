@@ -149,7 +149,7 @@ class PerformanceTracker:
         # Obtener TODAS las señales pendientes (sin límite de tiempo para verificación más agresiva)
         cursor.execute('''
             SELECT * FROM signals
-            WHERE result IS NULL OR result = 'None'
+            WHERE result IS NULL OR result = 'None' OR result = ''
             ORDER BY timestamp DESC
         ''')
 
@@ -241,7 +241,7 @@ class PerformanceTracker:
             # Obtener todas las señales pendientes (incluyendo result NULL)
             cursor.execute('''
                 SELECT * FROM signals
-                WHERE result IS NULL OR result = "None"
+                WHERE result IS NULL OR result = 'None' OR result = ''
                 ORDER BY timestamp ASC
             ''')
             pending_signals = cursor.fetchall()
@@ -346,7 +346,8 @@ class PerformanceTracker:
     def get_recent_signals(self, limit=50):
         """Obtiene las señales recientes con el mismo formato que usa get_performance_stats"""
         try:
-            cursor = self.conn.cursor()
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
 
             cursor.execute('''
                 SELECT * FROM signals
@@ -372,12 +373,15 @@ class PerformanceTracker:
                     'signal_type': signal[3],
                     'entry_price': safe_float(signal[4]),
                     'score': safe_float(signal[5]),
-                    'result': signal[18] if signal[18] is not None else None,
-                    'actual_return': safe_float(signal[21]),
-                    'time_to_resolution': safe_float(signal[22]),
+                    'tp_price': safe_float(signal[15]),  # Take Profit
+                    'sl_price': safe_float(signal[16]),  # Stop Loss
+                    'result': signal[20] if signal[20] is not None else None,
+                    'actual_return': safe_float(signal[23]),
+                    'time_to_resolution': safe_float(signal[24]),
                     'today': signal[1][:10] == datetime.now().strftime('%Y-%m-%d') if signal[1] else False
                 })
 
+            conn.close()
             return recent_signals
 
         except Exception as e:
@@ -555,7 +559,7 @@ class PerformanceTracker:
         total_count = cursor.fetchone()[0]
         logger.info(f"📊 Total señales en BD: {total_count}")
 
-        cursor.execute('SELECT COUNT(*) FROM signals WHERE result IS NULL OR result = "None"')
+        cursor.execute('SELECT COUNT(*) FROM signals WHERE result IS NULL OR result = \'None\' OR result = \'\'')
         pending_count = cursor.fetchone()[0]
         logger.info(f"📊 Señales pendientes: {pending_count}")
 
@@ -575,7 +579,7 @@ class PerformanceTracker:
                 SUM(CASE WHEN result LIKE 'WIN%' THEN actual_return ELSE 0 END) as total_profit,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN actual_return ELSE 0 END) as total_loss
             FROM signals
-            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 80
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
         '''.format(days))
 
         basic_stats = cursor.fetchone()
@@ -594,7 +598,7 @@ class PerformanceTracker:
                 MAX(actual_return) as best_return,
                 MIN(actual_return) as worst_return
             FROM signals
-            WHERE datetime(timestamp) > datetime('now', '-{} days') AND score >= 80
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
             GROUP BY score_range
             ORDER BY MIN(score) DESC
         '''.format(days))

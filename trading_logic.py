@@ -244,7 +244,9 @@ class TradingLogic:
                 # Solo logging, sin email
                 self.update_signal_tracking(symbol, signal_type, data["price"])
 
-                # NO registrar aquí - ya se registró arriba para evitar duplicación
+                # Registrar en performance tracker SIEMPRE (con o sin email)
+                if TRACKING_ENABLED:
+                    self.record_signal_for_tracking(symbol, signal_type, data, conditions, price_targets)
 
                 # Actualizar market_data
                 market_data[symbol]["last_signal"] = signal_type
