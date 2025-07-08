@@ -91,6 +91,15 @@ def trading_loop():
                     except Exception as e:
                         logger.error(f"❌ Error evaluando señales pendientes: {e}")
 
+                # Análisis de optimización cada 20 ciclos (cada ~20 minutos)
+                if cycle_count % 20 == 0:
+                    try:
+                        from adaptive_optimizer import adaptive_optimizer
+                        if adaptive_optimizer.should_optimize():
+                            adaptive_optimizer.log_optimization_analysis()
+                    except Exception as e:
+                        logger.error(f"❌ Error en análisis de optimización: {e}")
+
                 logger.info(f"✅ Ciclo {cycle_count} completado - {signals_sent} señales enviadas")
             else:
                 logger.error(f"❌ Error en ciclo {cycle_count}")

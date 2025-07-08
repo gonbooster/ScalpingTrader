@@ -561,7 +561,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             let allSignals = [];
             let filteredSignals = [];
             let currentPage = 1;
-            let pageSize = 25;
+            let pageSize = 100;
 
             // Cargar datos iniciales
             function loadSignalsData() {{
@@ -686,7 +686,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 document.getElementById('statusFilter').value = '';
                 document.getElementById('scoreFilter').value = '';
                 document.getElementById('pageSize').value = '25';
-                pageSize = 25;
+                pageSize = 100;
                 applyFilters();
             }}
 
@@ -847,17 +847,31 @@ def generate_signals_table(recent_signals):
         print(f"DEBUG: signal {signal.get('id')} result_raw = '{result_raw}' (type: {type(result_raw)})")
 
         if result_raw in ['WIN', 'WIN_TP', 'WIN_TIME'] or result_raw == 1:
-            result_text = '✅ WIN'
-            status_class = 'status-win'
+            if 'TP' in str(result_raw):
+                result_text = '✅ WIN'
+                status_class = 'status-win'
+                tooltip = 'Señal exitosa: Alcanzó el Take Profit objetivo'
+            else:
+                result_text = '✅ WIN'
+                status_class = 'status-win'
+                tooltip = 'Señal exitosa: Movimiento favorable después del tiempo límite'
         elif result_raw in ['LOSS', 'LOSS_SL', 'LOSS_TIME'] or result_raw == 0:
-            result_text = '❌ LOSS'
-            status_class = 'status-loss'
+            if 'SL' in str(result_raw):
+                result_text = '❌ LOSS'
+                status_class = 'status-loss'
+                tooltip = 'Señal fallida: Alcanzó el Stop Loss'
+            else:
+                result_text = '❌ LOSS'
+                status_class = 'status-loss'
+                tooltip = 'Señal fallida: Movimiento desfavorable después del tiempo límite'
         elif result_raw == 'EXPIRED' or result_raw == 2:
             result_text = '⏰ EXPIRED'
             status_class = 'status-pending'
+            tooltip = 'Señal expirada: No alcanzó TP/SL en 3 horas (movimiento insuficiente o mercado lateral)'
         elif result_raw is None or str(result_raw) == 'None' or result_raw == '':
             result_text = '🔄 PENDING'
             status_class = 'status-pending'
+            tooltip = 'Señal activa esperando alcanzar Take Profit o Stop Loss'
         else:
             # Si es un número extraño, convertir a estado
             try:
@@ -865,19 +879,24 @@ def generate_signals_table(recent_signals):
                 if num_result == 1:
                     result_text = '✅ WIN'
                     status_class = 'status-win'
+                    tooltip = 'Señal exitosa: Movimiento favorable'
                 elif num_result == 0:
                     result_text = '❌ LOSS'
                     status_class = 'status-loss'
+                    tooltip = 'Señal fallida: Movimiento desfavorable'
                 elif num_result == 2:
                     result_text = '⏰ EXPIRED'
                     status_class = 'status-pending'
+                    tooltip = 'Señal expirada: Tiempo límite alcanzado sin resolución'
                 else:
                     result_text = '🔄 PENDING'
                     status_class = 'status-pending'
+                    tooltip = 'Señal en espera de resolución'
             except:
                 # Valor desconocido, mostrar tal como está para debug
                 result_text = f'❓ {result_raw}'
                 status_class = 'status-pending'
+                tooltip = f'Estado desconocido: {result_raw}'
 
         # Calcular retorno real - CORREGIR si contiene precios en lugar de %
         actual_return_raw = safe_float(signal.get('actual_return', 0))
@@ -950,7 +969,7 @@ def generate_signals_table(recent_signals):
             <td style="font-weight: 600;">${entry_price:,.2f}</td>
             <td style="font-size: 0.85rem; line-height: 1.2; color: #10b981;">{tp_sl_dollars}</td>
             <td style="font-size: 0.85rem; line-height: 1.2; color: #6366f1;">{tp_sl_percent}</td>
-            <td class="{status_class}"><strong>{result_text}</strong></td>
+            <td class="{status_class}" title="{tooltip}"><strong>{result_text}</strong></td>
             <td class="{status_class}">{actual_return:+.2f}%</td>
             <td>{int(time_resolution)} min</td>
         </tr>

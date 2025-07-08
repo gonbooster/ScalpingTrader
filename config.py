@@ -29,6 +29,12 @@ class Config:
     # Configuración de la aplicación
     ANALYSIS_INTERVAL = int(os.getenv("ANALYSIS_INTERVAL", "60"))  # segundos
     WEB_REFRESH_INTERVAL = int(os.getenv("WEB_REFRESH_INTERVAL", "30"))  # segundos
+
+    # Configuración de optimización (NUEVAS MEJORAS)
+    EMAIL_SCORE_THRESHOLD = int(os.getenv("EMAIL_SCORE_THRESHOLD", "85"))  # Score mínimo para emails
+    TIMEOUT_HOURS = int(os.getenv("TIMEOUT_HOURS", "3"))  # Horas para expirar señales
+    WIN_THRESHOLD_PERCENT = float(os.getenv("WIN_THRESHOLD_PERCENT", "1.2"))  # % para considerar WIN
+    LOSS_THRESHOLD_PERCENT = float(os.getenv("LOSS_THRESHOLD_PERCENT", "0.8"))  # % para considerar LOSS
     
     # Configuración de datos
     KLINES_LIMIT = int(os.getenv("KLINES_LIMIT", "100"))

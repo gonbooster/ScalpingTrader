@@ -183,21 +183,21 @@ class PerformanceTracker:
 
             if tp_sl_result:
                 result = tp_sl_result
-            elif hours_elapsed >= 2:  # Evaluar después de 2 horas
-                # Lógica basada en movimiento de precio
+            elif hours_elapsed >= 1:  # Evaluar después de 1 hora (optimizado)
+                # Lógica basada en movimiento de precio - MÁS AGRESIVA
                 if signal_type.upper() == 'BUY':
-                    if actual_return >= 1.5:  # +1.5% = WIN
+                    if actual_return >= 1.2:  # +1.2% = WIN (reducido de 1.5%)
                         result = 'WIN_TIME'
-                    elif actual_return <= -1.0:  # -1% = LOSS
+                    elif actual_return <= -0.8:  # -0.8% = LOSS (reducido de -1%)
                         result = 'LOSS_TIME'
-                    elif hours_elapsed >= 8:  # 8 horas = EXPIRED
+                    elif hours_elapsed >= 3:  # 3 horas = EXPIRED (reducido de 8h)
                         result = 'EXPIRED'
                 elif signal_type.upper() == 'SELL':
-                    if actual_return >= 1.5:  # Precio bajó 1.5% = WIN
+                    if actual_return >= 1.2:  # Precio bajó 1.2% = WIN (reducido de 1.5%)
                         result = 'WIN_TIME'
-                    elif actual_return <= -1.0:  # Precio subió 1% = LOSS
+                    elif actual_return <= -0.8:  # Precio subió 0.8% = LOSS (reducido de -1%)
                         result = 'LOSS_TIME'
-                    elif hours_elapsed >= 8:  # 8 horas = EXPIRED
+                    elif hours_elapsed >= 3:  # 3 horas = EXPIRED (reducido de 8h)
                         result = 'EXPIRED'
 
             # Si hay resultado, actualizar
@@ -271,43 +271,53 @@ class PerformanceTracker:
                 # Determinar resultado basado en tiempo y movimiento de precio
                 result = None
 
-                # Si han pasado más de 8 horas, marcar como EXPIRED automáticamente
-                if hours_elapsed >= 8:
+                # Si han pasado más de 3 horas, marcar como EXPIRED automáticamente
+                if hours_elapsed >= 3:
                     result = 'EXPIRED'
-                    logger.info(f"📊 ⏰ {symbol} {signal_type}: EXPIRED (8+ horas)")
+                    logger.info(f"📊 ⏰ {symbol} {signal_type}: EXPIRED (3+ horas)")
                 elif signal_type.upper() == 'BUY':
-                    if actual_return >= 1.5:  # +1.5% = WIN claro
+                    if actual_return >= 1.2:  # +1.2% = WIN claro (reducido de 1.5%)
                         result = 'WIN_TIME'
-                    elif actual_return <= -1.0:  # -1% = LOSS claro
+                    elif actual_return <= -0.8:  # -0.8% = LOSS claro (reducido de -1%)
                         result = 'LOSS_TIME'
-                    elif hours_elapsed >= 2:  # Evaluar después de 2 horas con criterios más flexibles
-                        if actual_return >= 0.8:  # +0.8% = WIN después de 2h
+                    elif hours_elapsed >= 1:  # Evaluar después de 1 hora con criterios más flexibles
+                        if actual_return >= 0.4:  # +0.4% = WIN después de 1h (más flexible)
                             result = 'WIN_TIME'
-                        elif actual_return <= -0.5:  # -0.5% = LOSS después de 2h
+                        elif actual_return <= -0.3:  # -0.3% = LOSS después de 1h (más flexible)
                             result = 'LOSS_TIME'
-                        else:
-                            result = 'EXPIRED'  # Neutral = EXPIRED
+                        elif hours_elapsed >= 2:  # Solo EXPIRED después de 2 horas
+                            if actual_return >= 0.2:  # Movimiento mínimo positivo = WIN
+                                result = 'WIN_TIME'
+                            elif actual_return <= -0.2:  # Movimiento mínimo negativo = LOSS
+                                result = 'LOSS_TIME'
+                            else:
+                                result = 'EXPIRED'  # Verdaderamente neutral = EXPIRED
                     else:
-                        # Menos de 2 horas, mantener PENDING solo si no hay movimiento claro
-                        if actual_return >= 1.5 or actual_return <= -1.0:
-                            result = 'WIN_TIME' if actual_return >= 1.5 else 'LOSS_TIME'
+                        # Menos de 1 hora, mantener PENDING solo si no hay movimiento claro
+                        if actual_return >= 1.2 or actual_return <= -0.8:
+                            result = 'WIN_TIME' if actual_return >= 1.2 else 'LOSS_TIME'
                         # Si no hay movimiento claro, mantener como PENDING
                 elif signal_type.upper() == 'SELL':
-                    if actual_return >= 1.5:  # Precio bajó 1.5% = WIN claro
+                    if actual_return >= 1.2:  # Precio bajó 1.2% = WIN claro (reducido de 1.5%)
                         result = 'WIN_TIME'
-                    elif actual_return <= -1.0:  # Precio subió 1% = LOSS claro
+                    elif actual_return <= -0.8:  # Precio subió 0.8% = LOSS claro (reducido de -1%)
                         result = 'LOSS_TIME'
-                    elif hours_elapsed >= 2:  # Evaluar después de 2 horas con criterios más flexibles
-                        if actual_return >= 0.8:  # Precio bajó 0.8% = WIN después de 2h
+                    elif hours_elapsed >= 1:  # Evaluar después de 1 hora con criterios más flexibles
+                        if actual_return >= 0.4:  # Precio bajó 0.4% = WIN después de 1h (más flexible)
                             result = 'WIN_TIME'
-                        elif actual_return <= -0.5:  # Precio subió 0.5% = LOSS después de 2h
+                        elif actual_return <= -0.3:  # Precio subió 0.3% = LOSS después de 1h (más flexible)
                             result = 'LOSS_TIME'
-                        else:
-                            result = 'EXPIRED'  # Neutral = EXPIRED
+                        elif hours_elapsed >= 2:  # Solo EXPIRED después de 2 horas
+                            if actual_return >= 0.2:  # Movimiento mínimo positivo = WIN
+                                result = 'WIN_TIME'
+                            elif actual_return <= -0.2:  # Movimiento mínimo negativo = LOSS
+                                result = 'LOSS_TIME'
+                            else:
+                                result = 'EXPIRED'  # Verdaderamente neutral = EXPIRED
                     else:
-                        # Menos de 2 horas, mantener PENDING solo si no hay movimiento claro
-                        if actual_return >= 1.5 or actual_return <= -1.0:
-                            result = 'WIN_TIME' if actual_return >= 1.5 else 'LOSS_TIME'
+                        # Menos de 1 hora, mantener PENDING solo si no hay movimiento claro
+                        if actual_return >= 1.2 or actual_return <= -0.8:
+                            result = 'WIN_TIME' if actual_return >= 1.2 else 'LOSS_TIME'
                         # Si no hay movimiento claro, mantener como PENDING
 
                 # Actualizar señal solo si hay un resultado definido

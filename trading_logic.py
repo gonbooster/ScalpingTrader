@@ -5,13 +5,20 @@ from datetime import datetime
 from email_service import send_signal_email
 from indicators import calculate_price_targets
 
-# Importar tracker de rendimiento
+# Importar tracker de rendimiento y optimizador adaptativo
 try:
     from performance_tracker import performance_tracker
     TRACKING_ENABLED = True
 except ImportError:
     TRACKING_ENABLED = False
     logging.warning("Performance tracker no disponible")
+
+try:
+    from adaptive_optimizer import adaptive_optimizer
+    OPTIMIZATION_ENABLED = True
+except ImportError:
+    OPTIMIZATION_ENABLED = False
+    logging.warning("Optimizador adaptativo no disponible")
 
 logger = logging.getLogger(__name__)
 
@@ -194,9 +201,9 @@ class TradingLogic:
 
             # Solo verificar límites de email si vamos a enviar email
             if send_email:
-                # SOLO ENVIAR EMAILS PARA SEÑALES PREMIUM (80+)
-                if data["score"] < 80:
-                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥80)")
+                # SOLO ENVIAR EMAILS PARA SEÑALES ULTRA-PREMIUM (85+)
+                if data["score"] < 85:
+                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥85)")
                     send_email = False  # Registrar pero no enviar email
 
                 # Verificar límite diario de emails para señales excelentes

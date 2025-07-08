@@ -175,12 +175,12 @@ def calculate_realistic_scalping_score(data):
     rsi_5m = data.get("rsi_5m", 50)
     rsi_15m = data.get("rsi_15m", 50)
 
-    # Momentum ascendente (aceleración de precio) - EQUILIBRADO PARA CALIDAD
-    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 50:  # Aceleración alcista fuerte
+    # Momentum ascendente OPTIMIZADO - Más estricto para mejor calidad
+    if rsi_1m > rsi_5m > rsi_15m and rsi_1m > 55:  # Aceleración alcista fuerte (más estricto)
         score += 30
-    elif rsi_1m > rsi_5m and rsi_1m > 45:  # Momentum positivo
+    elif rsi_1m > rsi_5m + 3 and rsi_1m > 50:  # Momentum positivo significativo
         score += 25
-    elif rsi_1m > 40:  # Momentum básico
+    elif rsi_1m > rsi_5m and rsi_1m > 45:  # Momentum básico
         score += 20
     else:  # Sin momentum
         score += 10
@@ -266,16 +266,16 @@ def calculate_realistic_scalping_score(data):
 def calculate_price_targets(current_price, atr_value, signal_type, symbol):
     """Calcula objetivos de precio basados en ATR y volatilidad"""
     
-    # Multiplicadores según el tipo de par
+    # Multiplicadores según el tipo de par - OPTIMIZADOS para mejor win rate
     if symbol.startswith('BTC'):
-        atr_multiplier_tp = 2.5  # Take Profit más conservador para BTC
-        atr_multiplier_sl = 1.2  # Stop Loss más ajustado
+        atr_multiplier_tp = 2.0  # TP más agresivo para BTC (reducido de 2.5)
+        atr_multiplier_sl = 1.0  # SL más ajustado (reducido de 1.2)
     elif symbol.startswith('ETH'):
-        atr_multiplier_tp = 2.8
-        atr_multiplier_sl = 1.3
+        atr_multiplier_tp = 2.2  # TP más agresivo (reducido de 2.8)
+        atr_multiplier_sl = 1.1  # SL más ajustado (reducido de 1.3)
     else:  # SOL y otros
-        atr_multiplier_tp = 3.0  # Más agresivo para altcoins
-        atr_multiplier_sl = 1.5
+        atr_multiplier_tp = 2.5  # TP más agresivo (reducido de 3.0)
+        atr_multiplier_sl = 1.2  # SL más ajustado (reducido de 1.5)
     
     if signal_type == "buy":
         # Para BUY: esperamos subida
