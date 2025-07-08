@@ -318,7 +318,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             
             <div class="warning">
                 ⚠️ DASHBOARD PRIVADO - Solo para análisis interno y mejora del sistema<br>
-                🎯 <strong>SISTEMA PROFESIONAL:</strong> Solo se analizan señales con Score ≥80 (PREMIUM). Estas son las únicas que envían emails y tienen máxima probabilidad de éxito (≥70%).
+                🎯 <strong>SISTEMA PROFESIONAL:</strong> Solo se envían emails para señales con Score ≥85 (ULTRA-PREMIUM). Estas tienen máxima probabilidad de éxito (≥70%).
             </div>
             
             <div class="stats-grid">
@@ -349,7 +349,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="stat-card" title="🎯 Score promedio del SISTEMA PROFESIONAL. Evalúa: Momentum Multi-timeframe (35%), Volumen Inteligente (30%), Price Action (25%), Volatilidad Controlada (10%). Solo señales ≥80 envían emails y se analizan aquí.">
                     <div class="stat-value neutral">{safe_float(performance_stats.get('avg_score', 0)):.0f}/100</div>
                     <div class="stat-label">Score Promedio (Sistema Profesional)</div>
-                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥80</div>
+                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥85</div>
                 </div>
             </div>
             
@@ -395,21 +395,25 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
 
                 <div class="chart-card">
                     <div class="chart-title">⏱️ Métricas de Sistema</div>
-                    <div class="score-item">
+                    <div class="score-item" title="Tiempo promedio que tardan las señales en resolverse (WIN/LOSS) o expirar">
                         <span class="score-range">Tiempo Promedio TP/SL</span>
                         <span class="score-stats">{performance_stats.get('avg_time_minutes', 0):.0f} minutos</span>
                     </div>
-                    <div class="score-item">
-                        <span class="score-range">Señales Hoy</span>
-                        <span class="score-stats">{len([s for s in recent_signals if s.get('today', False)])} señales</span>
+                    <div class="score-item" title="Total de señales generadas en las últimas 24 horas">
+                        <span class="score-range">Señales Últimas 24h</span>
+                        <span class="score-stats">{total_signals} señales</span>
                     </div>
-                    <div class="score-item">
+                    <div class="score-item" title="Hora de la última actualización de datos del sistema">
                         <span class="score-range">Última Actualización</span>
                         <span class="score-stats">{datetime.now().strftime('%H:%M:%S')}</span>
                     </div>
-                    <div class="score-item">
+                    <div class="score-item" title="Evaluación de la fiabilidad del sistema basada en el win rate actual">
                         <span class="score-range">Fiabilidad Sistema</span>
                         <span class="score-stats">{'🎯 Alta' if win_rate >= 60 else '⚠️ Media' if win_rate >= 50 else '❌ Baja'}</span>
+                    </div>
+                    <div class="score-item" title="Configuración actual del filtro de emails (solo señales ultra-premium)">
+                        <span class="score-range">Filtro Email</span>
+                        <span class="score-stats">Score ≥85</span>
                     </div>
                 </div>
             </div>
@@ -1010,21 +1014,36 @@ def get_analytics_data():
     return performance_stats, recent_signals, market_trends
 
 def generate_volatility_breakdown(volatility_analysis):
-    """Genera el análisis de volatilidad por símbolo"""
+    """Genera el análisis de volatilidad por símbolo - MEJORADO"""
     if not volatility_analysis:
         return "<div class='score-item'><span>No hay datos de volatilidad</span></div>"
 
     html = ""
     for item in volatility_analysis:
         emoji = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}.get(item['symbol'], "💰")
-        volatility_level = "🔥 Alta" if item.get('avg_atr', 0) > 100 else "⚡ Media" if item.get('avg_atr', 0) > 50 else "📊 Baja"
+
+        # Calcular ATR como porcentaje del precio promedio
+        avg_atr = safe_float(item.get('avg_atr', 0))
+
+        # Precios promedio aproximados para calcular porcentaje
+        avg_prices = {"BTCUSDT": 109000, "ETHUSDT": 2600, "SOLUSDT": 152}
+        avg_price = avg_prices.get(item['symbol'], 1)
+        atr_percent = (avg_atr / avg_price) * 100 if avg_price > 0 else 0
+
+        # Clasificar volatilidad basada en porcentaje
+        if atr_percent > 0.15:
+            volatility_level = "🔥 Alta"
+        elif atr_percent > 0.08:
+            volatility_level = "⚡ Media"
+        else:
+            volatility_level = "📊 Baja"
 
         html += f"""
         <div class="score-item">
             <span class="score-range">{emoji} {item['symbol']}</span>
             <div class="score-stats">
                 <span>{volatility_level}</span>
-                <span>ATR: {safe_float(item.get('avg_atr', 0)):.1f}</span>
+                <span>ATR: ${avg_atr:.1f} ({atr_percent:.2f}%)</span>
                 <span>Velas: {safe_float(item.get('avg_candle_volatility', 0)):.2f}%</span>
                 <span>{item.get('count', 0)} señales</span>
             </div>

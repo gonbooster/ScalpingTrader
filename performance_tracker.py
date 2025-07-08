@@ -594,13 +594,16 @@ class PerformanceTracker:
 
         basic_stats = cursor.fetchone()
 
-        # Estadísticas por score - SOLO SEÑALES EXCELENTES (≥85)
+        # Estadísticas por score - CORREGIDO PARA MOSTRAR TODOS LOS RANGOS
         cursor.execute('''
             SELECT
                 CASE
                     WHEN score >= 90 THEN 'ULTRA-PREMIUM (90-100)'
-                    WHEN score >= 80 THEN 'PREMIUM (80-89)'
-                    ELSE 'NO ANALIZADO (<80)'
+                    WHEN score >= 85 THEN 'PREMIUM (85-89)'
+                    WHEN score >= 80 THEN 'EXCELENTE (80-84)'
+                    WHEN score >= 70 THEN 'FUERTE (70-79)'
+                    WHEN score >= 60 THEN 'BUENA (60-69)'
+                    ELSE 'REGULAR (<60)'
                 END as score_range,
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
@@ -610,7 +613,15 @@ class PerformanceTracker:
             FROM signals
             WHERE datetime(timestamp) > datetime('now', '-{} days')
             GROUP BY score_range
-            ORDER BY MIN(score) DESC
+            ORDER BY
+                CASE
+                    WHEN score_range = 'ULTRA-PREMIUM (90-100)' THEN 1
+                    WHEN score_range = 'PREMIUM (85-89)' THEN 2
+                    WHEN score_range = 'EXCELENTE (80-84)' THEN 3
+                    WHEN score_range = 'FUERTE (70-79)' THEN 4
+                    WHEN score_range = 'BUENA (60-69)' THEN 5
+                    ELSE 6
+                END
         '''.format(days))
 
         score_stats = cursor.fetchall()
