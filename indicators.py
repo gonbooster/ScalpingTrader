@@ -266,16 +266,16 @@ def calculate_realistic_scalping_score(data):
 def calculate_price_targets(current_price, atr_value, signal_type, symbol):
     """Calcula objetivos de precio basados en ATR y volatilidad"""
     
-    # Multiplicadores según el tipo de par - OPTIMIZADOS para mejor win rate
+    # Multiplicadores según el tipo de par - ULTRA-CONSERVADORES para máximo win rate
     if symbol.startswith('BTC'):
-        atr_multiplier_tp = 2.0  # TP más agresivo para BTC (reducido de 2.5)
-        atr_multiplier_sl = 1.0  # SL más ajustado (reducido de 1.2)
+        atr_multiplier_tp = 1.5  # TP ultra-conservador para BTC (reducido de 2.0)
+        atr_multiplier_sl = 0.8  # SL más ajustado (reducido de 1.0)
     elif symbol.startswith('ETH'):
-        atr_multiplier_tp = 2.2  # TP más agresivo (reducido de 2.8)
-        atr_multiplier_sl = 1.1  # SL más ajustado (reducido de 1.3)
+        atr_multiplier_tp = 1.8  # TP ultra-conservador (reducido de 2.2)
+        atr_multiplier_sl = 0.9  # SL más ajustado (reducido de 1.1)
     else:  # SOL y otros
-        atr_multiplier_tp = 2.5  # TP más agresivo (reducido de 3.0)
-        atr_multiplier_sl = 1.2  # SL más ajustado (reducido de 1.5)
+        atr_multiplier_tp = 2.0  # TP ultra-conservador (reducido de 2.5)
+        atr_multiplier_sl = 1.0  # SL más ajustado (reducido de 1.2)
     
     if signal_type == "buy":
         # Para BUY: esperamos subida

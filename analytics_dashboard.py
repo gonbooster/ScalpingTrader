@@ -318,7 +318,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             
             <div class="warning">
                 ⚠️ DASHBOARD PRIVADO - Solo para análisis interno y mejora del sistema<br>
-                🎯 <strong>SISTEMA PROFESIONAL:</strong> Solo se envían emails para señales con Score ≥85 (ULTRA-PREMIUM). Estas tienen máxima probabilidad de éxito (≥70%).
+                🎯 <strong>SISTEMA PROFESIONAL:</strong> Solo se envían emails para señales con Score ≥90 (ULTRA-PREMIUM). Estas tienen máxima probabilidad de éxito (≥70%).
             </div>
             
             <div class="stats-grid">
@@ -349,7 +349,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="stat-card" title="🎯 Score promedio del SISTEMA PROFESIONAL. Evalúa: Momentum Multi-timeframe (35%), Volumen Inteligente (30%), Price Action (25%), Volatilidad Controlada (10%). Solo señales ≥80 envían emails y se analizan aquí.">
                     <div class="stat-value neutral">{safe_float(performance_stats.get('avg_score', 0)):.0f}/100</div>
                     <div class="stat-label">Score Promedio (Sistema Profesional)</div>
-                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥85</div>
+                    <div class="stat-trend">⏱️ Tiempo medio: {safe_float(performance_stats.get('avg_time_minutes', 0)):.0f} min • 📧 Solo Score ≥90</div>
                 </div>
             </div>
             
@@ -394,6 +394,13 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 </div>
 
                 <div class="chart-card">
+                    <div class="chart-title">📊 Rachas por Símbolo</div>
+                    <div class="score-breakdown">
+                        {generate_symbol_streaks(performance_stats.get('symbol_streaks', {}))}
+                    </div>
+                </div>
+
+                <div class="chart-card">
                     <div class="chart-title">⏱️ Métricas de Sistema</div>
                     <div class="score-item" title="Tiempo promedio que tardan las señales en resolverse (WIN/LOSS) o expirar">
                         <span class="score-range">Tiempo Promedio TP/SL</span>
@@ -413,7 +420,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     </div>
                     <div class="score-item" title="Configuración actual del filtro de emails (solo señales ultra-premium)">
                         <span class="score-range">Filtro Email</span>
-                        <span class="score-stats">Score ≥85</span>
+                        <span class="score-stats">Score ≥90</span>
                     </div>
                 </div>
             </div>
@@ -1095,4 +1102,56 @@ def generate_streak_analysis(streak_analysis):
         </div>
     </div>
     """
+    return html
+
+def generate_symbol_streaks(symbol_streaks):
+    """Genera el análisis de rachas por símbolo"""
+    if not symbol_streaks:
+        return "<div class='score-item'><span>No hay datos de rachas por símbolo</span></div>"
+
+    html = ""
+    symbol_emojis = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}
+
+    for symbol, data in symbol_streaks.items():
+        emoji = symbol_emojis.get(symbol, "💰")
+        current_streak = data.get('current_streak', 0)
+        max_win = data.get('max_win_streak', 0)
+        max_loss = data.get('max_loss_streak', 0)
+        last_time = data.get('last_signal_time', '')
+
+        # Determinar estado actual
+        if current_streak > 0:
+            current_text = f"🔥 Ganando {current_streak}"
+            current_class = "win-rate"
+        elif current_streak < 0:
+            current_text = f"❄️ Perdiendo {abs(current_streak)}"
+            current_class = "loss-rate"
+        else:
+            current_text = "⚪ Neutral"
+            current_class = "neutral"
+
+        # Calcular tiempo desde última señal
+        time_info = ""
+        if last_time:
+            try:
+                from datetime import datetime
+                last_dt = datetime.fromisoformat(last_time.replace('Z', '+00:00'))
+                hours_ago = (datetime.now() - last_dt).total_seconds() / 3600
+                if hours_ago < 1:
+                    time_info = f"({int(hours_ago * 60)}min)"
+                else:
+                    time_info = f"({int(hours_ago)}h)"
+            except:
+                time_info = ""
+
+        html += f"""
+        <div class="score-item">
+            <span class="score-range">{emoji} {symbol}</span>
+            <div class="score-stats">
+                <span class="{current_class}">{current_text} {time_info}</span>
+                <span class="win-rate">🏆 {max_win}</span>
+                <span class="loss-rate">💀 {max_loss}</span>
+            </div>
+        </div>
+        """
     return html

@@ -137,8 +137,8 @@ class TradingLogic:
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos BUY: 5 de 8 condiciones principales + distancia OK (MÁXIMA PRECISIÓN)
-        required_main = 5
+        # Requerimientos BUY: 6 de 8 condiciones principales + distancia OK (MÁXIMA PRECISIÓN)
+        required_main = 6
         main_valid = main_fulfilled >= required_main
 
         logger.info(f"🔍 BUY {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
@@ -201,9 +201,9 @@ class TradingLogic:
 
             # Solo verificar límites de email si vamos a enviar email
             if send_email:
-                # SOLO ENVIAR EMAILS PARA SEÑALES ULTRA-PREMIUM (85+)
-                if data["score"] < 85:
-                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥85)")
+                # SOLO ENVIAR EMAILS PARA SEÑALES ULTRA-PREMIUM (90+)
+                if data["score"] < 90:
+                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥90)")
                     send_email = False  # Registrar pero no enviar email
 
                 # Verificar límite diario de emails para señales excelentes

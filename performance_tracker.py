@@ -271,10 +271,10 @@ class PerformanceTracker:
                 # Determinar resultado basado en tiempo y movimiento de precio
                 result = None
 
-                # Si han pasado más de 3 horas, marcar como EXPIRED automáticamente
-                if hours_elapsed >= 3:
+                # Si han pasado más de 2 horas, marcar como EXPIRED automáticamente - OPTIMIZADO
+                if hours_elapsed >= 2:
                     result = 'EXPIRED'
-                    logger.info(f"📊 ⏰ {symbol} {signal_type}: EXPIRED (3+ horas)")
+                    logger.info(f"📊 ⏰ {symbol} {signal_type}: EXPIRED (2+ horas)")
                 elif signal_type.upper() == 'BUY':
                     if actual_return >= 1.2:  # +1.2% = WIN claro (reducido de 1.5%)
                         result = 'WIN_TIME'
@@ -676,7 +676,7 @@ class PerformanceTracker:
 
         volatility_stats = cursor.fetchall()
 
-        # Análisis de streaks (rachas)
+        # Análisis de streaks (rachas) - GENERAL
         cursor.execute('''
             SELECT
                 result,
@@ -690,6 +690,31 @@ class PerformanceTracker:
 
         streak_data = cursor.fetchall()
         current_streak, max_win_streak, max_loss_streak = self.calculate_streaks(streak_data)
+
+        # Análisis de streaks POR SÍMBOLO
+        symbol_streaks = {}
+        for symbol in ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']:
+            cursor.execute('''
+                SELECT
+                    result,
+                    timestamp,
+                    symbol
+                FROM signals
+                WHERE result IS NOT NULL AND result != 'None'
+                AND symbol = ?
+                AND datetime(timestamp) > datetime('now', '-{} days')
+                ORDER BY timestamp DESC
+            '''.format(days), (symbol,))
+
+            symbol_data = cursor.fetchall()
+            if symbol_data:
+                current, max_win, max_loss = self.calculate_streaks(symbol_data)
+                symbol_streaks[symbol] = {
+                    'current_streak': current,
+                    'max_win_streak': max_win,
+                    'max_loss_streak': max_loss,
+                    'last_signal_time': symbol_data[0][1] if symbol_data else None
+                }
 
         conn.close()
 
@@ -780,7 +805,8 @@ class PerformanceTracker:
                 'max_win_streak': max_win_streak,
                 'max_loss_streak': max_loss_streak,
                 'streak_status': 'WIN' if current_streak > 0 else 'LOSS' if current_streak < 0 else 'NEUTRAL'
-            }
+            },
+            'symbol_streaks': symbol_streaks
         }
 
 # Instancia global
