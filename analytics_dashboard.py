@@ -122,16 +122,18 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             }}
             .win-loss-container {{
                 display: flex;
-                gap: 16px;
+                gap: 12px;
                 justify-content: center;
+                flex-wrap: wrap;
             }}
             .win-loss-item {{
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                padding: 8px 14px;
-                border-radius: 8px;
-                min-width: 65px;
+                padding: 6px 10px;
+                border-radius: 6px;
+                min-width: 55px;
+                flex: 1;
             }}
             .win-loss-item.win {{
                 background: rgba(34, 197, 94, 0.15);
@@ -140,6 +142,14 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             .win-loss-item.loss {{
                 background: rgba(239, 68, 68, 0.15);
                 border: 1px solid rgba(239, 68, 68, 0.3);
+            }}
+            .win-loss-item.expired {{
+                background: rgba(251, 191, 36, 0.15);
+                border: 1px solid rgba(251, 191, 36, 0.3);
+            }}
+            .win-loss-item.pending {{
+                background: rgba(59, 130, 246, 0.15);
+                border: 1px solid rgba(59, 130, 246, 0.3);
             }}
             .win-loss-number {{
                 font-size: 1.3rem;
@@ -151,6 +161,12 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
             }}
             .win-loss-item.loss .win-loss-number {{
                 color: #ef4444;
+            }}
+            .win-loss-item.expired .win-loss-number {{
+                color: #f59e0b;
+            }}
+            .win-loss-item.pending .win-loss-number {{
+                color: #3b82f6;
             }}
             .win-loss-label {{
                 font-size: 0.75rem;
@@ -766,7 +782,7 @@ def generate_score_breakdown(score_breakdown):
     return html
 
 def generate_symbol_breakdown(symbol_breakdown, symbol_streaks=None):
-    """Genera el desglose de rendimiento por símbolo con wins/losses claros y rachas"""
+    """Genera el desglose de rendimiento por símbolo con wins/losses/pending/expired claros y rachas"""
     if not symbol_breakdown:
         return "<div class='score-item'><span>No hay datos suficientes</span></div>"
 
@@ -776,9 +792,11 @@ def generate_symbol_breakdown(symbol_breakdown, symbol_streaks=None):
         total_signals = item.get('count', 0)
         wins = item.get('wins', 0)
         losses = item.get('losses', 0)
+        expired = item.get('expired', 0)
+        pending = item.get('pending', 0)
 
-        # Si no tenemos wins/losses, calcularlos del win_rate
-        if wins == 0 and losses == 0 and total_signals > 0:
+        # Si no tenemos wins/losses, calcularlos del win_rate (solo para casos legacy)
+        if wins == 0 and losses == 0 and total_signals > 0 and expired == 0 and pending == 0:
             wins = int(total_signals * win_rate / 100)
             losses = total_signals - wins
 
@@ -802,6 +820,14 @@ def generate_symbol_breakdown(symbol_breakdown, symbol_streaks=None):
                     <div class="win-loss-item loss">
                         <span class="win-loss-number">{losses}</span>
                         <span class="win-loss-label">❌ Fallos</span>
+                    </div>
+                    <div class="win-loss-item expired">
+                        <span class="win-loss-number">{expired}</span>
+                        <span class="win-loss-label">⏰ Expiradas</span>
+                    </div>
+                    <div class="win-loss-item pending">
+                        <span class="win-loss-number">{pending}</span>
+                        <span class="win-loss-label">🔄 Pendientes</span>
                     </div>
                 </div>
                 <div class="symbol-metrics">

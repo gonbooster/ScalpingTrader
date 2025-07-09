@@ -633,6 +633,8 @@ class PerformanceTracker:
                 COUNT(*) as count,
                 SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
                 SUM(CASE WHEN result LIKE 'LOSS%' THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN result = 'EXPIRED' THEN 1 ELSE 0 END) as expired,
+                SUM(CASE WHEN result IS NULL OR result = 'None' OR result = '' THEN 1 ELSE 0 END) as pending,
                 AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
                 AVG(score) as avg_score
             FROM signals
@@ -762,9 +764,11 @@ class PerformanceTracker:
                     'count': row[1],
                     'wins': row[2],
                     'losses': row[3],
-                    'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
-                    'avg_return': row[4] or 0,
-                    'avg_score': row[5] or 0
+                    'expired': row[4],
+                    'pending': row[5],
+                    'win_rate': (row[2] / (row[2] + row[3]) * 100) if (row[2] + row[3]) > 0 else 0,
+                    'avg_return': row[6] or 0,
+                    'avg_score': row[7] or 0
                 }
                 for row in symbol_stats
             ],
