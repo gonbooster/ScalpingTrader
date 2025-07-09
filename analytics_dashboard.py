@@ -129,9 +129,9 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                padding: 12px 20px;
-                border-radius: 12px;
-                min-width: 80px;
+                padding: 8px 14px;
+                border-radius: 8px;
+                min-width: 65px;
             }}
             .win-loss-item.win {{
                 background: rgba(34, 197, 94, 0.15);
@@ -142,9 +142,9 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 border: 1px solid rgba(239, 68, 68, 0.3);
             }}
             .win-loss-number {{
-                font-size: 1.5rem;
+                font-size: 1.3rem;
                 font-weight: 800;
-                margin-bottom: 4px;
+                margin-bottom: 3px;
             }}
             .win-loss-item.win .win-loss-number {{
                 color: #22c55e;
@@ -153,7 +153,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 color: #ef4444;
             }}
             .win-loss-label {{
-                font-size: 0.8rem;
+                font-size: 0.75rem;
                 font-weight: 600;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
@@ -364,7 +364,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 <div class="chart-card">
                     <div class="chart-title">💰 Análisis por Símbolo</div>
                     <div class="score-breakdown">
-                        {generate_symbol_breakdown(performance_stats.get('symbol_breakdown', []))}
+                        {generate_symbol_breakdown(performance_stats.get('symbol_breakdown', []), performance_stats.get('symbol_streaks', {}))}
                     </div>
                 </div>
             </div>
@@ -393,12 +393,7 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     </div>
                 </div>
 
-                <div class="chart-card">
-                    <div class="chart-title">📊 Rachas por Símbolo</div>
-                    <div class="score-breakdown">
-                        {generate_symbol_streaks(performance_stats.get('symbol_streaks', {}))}
-                    </div>
-                </div>
+
 
                 <div class="chart-card">
                     <div class="chart-title">⏱️ Métricas de Sistema</div>
@@ -770,8 +765,8 @@ def generate_score_breakdown(score_breakdown):
         """
     return html
 
-def generate_symbol_breakdown(symbol_breakdown):
-    """Genera el desglose de rendimiento por símbolo con wins/losses claros"""
+def generate_symbol_breakdown(symbol_breakdown, symbol_streaks=None):
+    """Genera el desglose de rendimiento por símbolo con wins/losses claros y rachas"""
     if not symbol_breakdown:
         return "<div class='score-item'><span>No hay datos suficientes</span></div>"
 
@@ -813,6 +808,7 @@ def generate_symbol_breakdown(symbol_breakdown):
                     <span class="metric">📊 {total_signals} señales</span>
                     <span class="metric return {color_class}">{safe_float(item.get('avg_return', 0)):+.2f}%</span>
                     <span class="metric">🎯 {safe_float(item.get('avg_score', 0)):.0f}/100</span>
+                    {generate_streak_info_for_symbol(item.get('symbol', ''), symbol_streaks)}
                 </div>
             </div>
         </div>
@@ -1104,54 +1100,46 @@ def generate_streak_analysis(streak_analysis):
     """
     return html
 
-def generate_symbol_streaks(symbol_streaks):
-    """Genera el análisis de rachas por símbolo"""
-    if not symbol_streaks:
-        return "<div class='score-item'><span>No hay datos de rachas por símbolo</span></div>"
 
-    html = ""
-    symbol_emojis = {"BTCUSDT": "₿", "ETHUSDT": "Ξ", "SOLUSDT": "◎"}
 
-    for symbol, data in symbol_streaks.items():
-        emoji = symbol_emojis.get(symbol, "💰")
-        current_streak = data.get('current_streak', 0)
-        max_win = data.get('max_win_streak', 0)
-        max_loss = data.get('max_loss_streak', 0)
-        last_time = data.get('last_signal_time', '')
+def generate_streak_info_for_symbol(symbol, symbol_streaks):
+    """Genera información de racha para un símbolo específico"""
+    if not symbol_streaks or symbol not in symbol_streaks:
+        return ""
 
-        # Determinar estado actual
-        if current_streak > 0:
-            current_text = f"🔥 Ganando {current_streak}"
-            current_class = "win-rate"
-        elif current_streak < 0:
-            current_text = f"❄️ Perdiendo {abs(current_streak)}"
-            current_class = "loss-rate"
-        else:
-            current_text = "⚪ Neutral"
-            current_class = "neutral"
+    streak_data = symbol_streaks[symbol]
+    current_streak = streak_data.get('current_streak', 0)
+    max_win = streak_data.get('max_win_streak', 0)
+    max_loss = streak_data.get('max_loss_streak', 0)
+    last_time = streak_data.get('last_signal_time', '')
 
-        # Calcular tiempo desde última señal
-        time_info = ""
-        if last_time:
-            try:
-                from datetime import datetime
-                last_dt = datetime.fromisoformat(last_time.replace('Z', '+00:00'))
-                hours_ago = (datetime.now() - last_dt).total_seconds() / 3600
-                if hours_ago < 1:
-                    time_info = f"({int(hours_ago * 60)}min)"
-                else:
-                    time_info = f"({int(hours_ago)}h)"
-            except:
-                time_info = ""
+    # Determinar estado actual
+    if current_streak > 0:
+        current_text = f"🔥 +{current_streak}"
+        current_class = "win-rate"
+    elif current_streak < 0:
+        current_text = f"❄️ {current_streak}"
+        current_class = "loss-rate"
+    else:
+        current_text = "⚪ 0"
+        current_class = "neutral"
 
-        html += f"""
-        <div class="score-item">
-            <span class="score-range">{emoji} {symbol}</span>
-            <div class="score-stats">
-                <span class="{current_class}">{current_text} {time_info}</span>
-                <span class="win-rate">🏆 {max_win}</span>
-                <span class="loss-rate">💀 {max_loss}</span>
-            </div>
-        </div>
-        """
-    return html
+    # Calcular tiempo desde última señal
+    time_info = ""
+    if last_time:
+        try:
+            from datetime import datetime
+            last_dt = datetime.fromisoformat(last_time.replace('Z', '+00:00'))
+            hours_ago = (datetime.now() - last_dt).total_seconds() / 3600
+            if hours_ago < 1:
+                time_info = f"({int(hours_ago * 60)}min)"
+            else:
+                time_info = f"({int(hours_ago)}h)"
+        except:
+            time_info = ""
+
+    return f"""
+    <span class="metric {current_class}" title="Racha actual: {current_text} | Mejor ganadora: {max_win} | Peor perdedora: {max_loss}">
+        {current_text} {time_info} (🏆{max_win}/💀{max_loss})
+    </span>
+    """
