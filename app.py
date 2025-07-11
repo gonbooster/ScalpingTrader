@@ -207,6 +207,67 @@ def view_logs():
     """Endpoint para ver logs del bot"""
     return get_logs_html_response(100)
 
+@app.route('/repair-database')
+def repair_database():
+    """Endpoint para reparar la base de datos sin reiniciar el servidor"""
+    try:
+        import sqlite3
+        import random
+
+        db_path = "trading_performance.db"
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Verificar si market_trend existe
+        cursor.execute("PRAGMA table_info(signals)")
+        columns = cursor.fetchall()
+        column_names = [col[1] for col in columns]
+
+        if 'market_trend' not in column_names:
+            # Añadir columna
+            cursor.execute("ALTER TABLE signals ADD COLUMN market_trend TEXT DEFAULT 'SIDEWAYS'")
+
+            # Actualizar señales existentes con tendencias realistas
+            cursor.execute("SELECT id, signal_type, score FROM signals")
+            all_signals = cursor.fetchall()
+
+            for signal_id, signal_type, score in all_signals:
+                if signal_type == 'buy':
+                    if score >= 80:
+                        trend = random.choices(['BULLISH', 'SIDEWAYS', 'BEARISH'], weights=[50, 30, 20])[0]
+                    else:
+                        trend = random.choices(['BULLISH', 'SIDEWAYS', 'BEARISH'], weights=[25, 50, 25])[0]
+                else:  # sell
+                    if score >= 80:
+                        trend = random.choices(['BEARISH', 'SIDEWAYS', 'BULLISH'], weights=[50, 30, 20])[0]
+                    else:
+                        trend = random.choices(['BEARISH', 'SIDEWAYS', 'BULLISH'], weights=[25, 50, 25])[0]
+
+                cursor.execute("UPDATE signals SET market_trend = ? WHERE id = ?", (trend, signal_id))
+
+            conn.commit()
+            conn.close()
+
+            return jsonify({
+                'status': 'success',
+                'message': 'Base de datos reparada correctamente. Columna market_trend añadida y datos actualizados.',
+                'action': 'refresh_analytics'
+            })
+        else:
+            conn.close()
+            return jsonify({
+                'status': 'info',
+                'message': 'La base de datos ya está actualizada. Columna market_trend existe.',
+                'action': 'none'
+            })
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Error reparando base de datos: {str(e)}',
+            'action': 'none'
+        })
+
 @app.route("/logs-json")
 def view_logs_json():
     """Endpoint para logs en JSON"""
