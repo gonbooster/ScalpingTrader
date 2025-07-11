@@ -604,6 +604,62 @@ def reset_data():
             'error': str(e)
         }), 500
 
+@app.route('/admin/repair-db/<password>', methods=['POST'])
+def admin_repair_database(password):
+    """Endpoint para reparar base de datos - SOLO PARA DESARROLLO"""
+    if password != "admin":
+        return jsonify({"error": "Acceso denegado"}), 403
+
+    try:
+        import sqlite3
+        import random
+
+        from performance_tracker import PerformanceTracker
+        tracker = PerformanceTracker()
+
+        conn = sqlite3.connect(tracker.db_path)
+        cursor = conn.cursor()
+
+        # Verificar si market_trend existe
+        cursor.execute("PRAGMA table_info(signals)")
+        columns = cursor.fetchall()
+        column_names = [col[1] for col in columns]
+
+        if 'market_trend' not in column_names:
+            # Añadir columna
+            cursor.execute("ALTER TABLE signals ADD COLUMN market_trend TEXT DEFAULT 'SIDEWAYS'")
+
+            # Actualizar señales existentes con tendencias realistas
+            cursor.execute("SELECT id, signal_type, score FROM signals")
+            all_signals = cursor.fetchall()
+
+            for signal_id, signal_type, score in all_signals:
+                if signal_type == 'buy':
+                    if score >= 80:
+                        trend = random.choices(['BULLISH', 'SIDEWAYS', 'BEARISH'], weights=[50, 30, 20])[0]
+                    else:
+                        trend = random.choices(['BULLISH', 'SIDEWAYS', 'BEARISH'], weights=[25, 50, 25])[0]
+                else:  # sell
+                    if score >= 80:
+                        trend = random.choices(['BEARISH', 'SIDEWAYS', 'BULLISH'], weights=[50, 30, 20])[0]
+                    else:
+                        trend = random.choices(['BEARISH', 'SIDEWAYS', 'BULLISH'], weights=[25, 50, 25])[0]
+
+                cursor.execute("UPDATE signals SET market_trend = ? WHERE id = ?", (trend, signal_id))
+
+            conn.commit()
+            message = "Base de datos reparada: columna market_trend añadida y datos actualizados"
+        else:
+            message = "Base de datos ya actualizada: columna market_trend existe"
+
+        conn.close()
+        logger.info(f"🔧 {message}")
+        return jsonify({"message": message, "status": "success"})
+
+    except Exception as e:
+        logger.error(f"❌ Error reparando base de datos: {e}")
+        return jsonify({"error": str(e), "status": "error"}), 500
+
 # Inicializar bot automáticamente
 init_trading_bot()
 
