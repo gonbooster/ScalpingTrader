@@ -1,6 +1,7 @@
 # trading_logic.py - Lógica de trading y señales
 import logging
 import time
+import numpy as np
 from datetime import datetime
 from email_service import send_signal_email
 from indicators import calculate_price_targets
@@ -105,17 +106,86 @@ class TradingLogic:
             "timestamp": datetime.now().isoformat()
         }
     
+    def detect_market_trend(self, symbol, timeframe_data):
+        """Detecta la tendencia del mercado usando datos reales de Binance"""
+        try:
+            if not timeframe_data or "1h" not in timeframe_data:
+                return 'SIDEWAYS'  # Default si no hay datos
+
+            data_1h = timeframe_data["1h"]
+            if not data_1h or len(data_1h) < 20:
+                return 'SIDEWAYS'
+
+            from binance_api import extract_prices
+            from indicators import calculate_ema
+
+            prices_1h = extract_prices(data_1h)
+            closes_1h = np.array(prices_1h["closes"])
+
+            # EMAs para determinar tendencia
+            ema_20 = calculate_ema(closes_1h, 20)
+            ema_50 = calculate_ema(closes_1h, 50) if len(closes_1h) >= 50 else ema_20
+            current_price = closes_1h[-1]
+
+            # Calcular slope de precios (últimas 10 velas)
+            recent_prices = closes_1h[-10:]
+            price_slope = (recent_prices[-1] - recent_prices[0]) / recent_prices[0] * 100
+
+            # Determinar tendencia basada en datos reales
+            if current_price > ema_20 > ema_50 and price_slope > 1.0:
+                return 'BULLISH'
+            elif current_price < ema_20 < ema_50 and price_slope < -1.0:
+                return 'BEARISH'
+            else:
+                return 'SIDEWAYS'
+
+        except Exception as e:
+            logger.error(f"Error detectando tendencia para {symbol}: {e}")
+            return 'SIDEWAYS'
+
+    def check_trend_filter(self, symbol, signal_type, market_trend):
+        """Filtro adaptativo basado en análisis de datos reales"""
+        # Basado en análisis real: SELL en BEARISH = 66.7% WR, BUY en BULLISH = 50% WR
+
+        if market_trend == "BEARISH":
+            if signal_type == "sell":
+                logger.info(f"✅ {symbol}: SELL en mercado BEARISH - Filtro APROBADO (WR histórico: 66.7%)")
+                return True, 60  # Score mínimo reducido para aprovechar alta efectividad
+            else:
+                logger.info(f"❌ {symbol}: BUY en mercado BEARISH - Filtro RECHAZADO (WR histórico: 7.7%)")
+                return False, 0
+
+        elif market_trend == "BULLISH":
+            if signal_type == "buy":
+                logger.info(f"✅ {symbol}: BUY en mercado BULLISH - Filtro APROBADO (WR histórico: 50%)")
+                return True, 70  # Score mínimo moderado
+            else:
+                logger.info(f"⚠️ {symbol}: SELL en mercado BULLISH - Filtro RECHAZADO (sin datos históricos)")
+                return False, 0
+
+        else:  # SIDEWAYS
+            # Mercado lateral tiene baja efectividad según datos reales
+            logger.info(f"⚠️ {symbol}: {signal_type.upper()} en mercado SIDEWAYS - Filtro RECHAZADO (WR histórico: <25%)")
+            return False, 0
+
     def check_buy_conditions(self, symbol, market_data, timeframe_data):
-        """Verifica condiciones para señal de compra"""
+        """Verifica condiciones para señal de compra con filtro de tendencia"""
         data = market_data[symbol]
-        
-        # Condiciones básicas
+
+        # 1. FILTRO DE TENDENCIA PRIMERO (basado en datos reales)
+        market_trend = self.detect_market_trend(symbol, timeframe_data)
+        trend_approved, min_score_required = self.check_trend_filter(symbol, "buy", market_trend)
+
+        if not trend_approved:
+            return False, {}  # Rechazar inmediatamente si la tendencia no es favorable
+
+        # 2. Condiciones básicas con score adaptativo
         conditions = {
             "RSI_1m_favorable": 30 <= data["rsi_1m"] <= 70,
             "RSI_15m_bullish": data["rsi_15m"] > 50,
             "EMA_crossover": data["ema_fast"] > data["ema_slow"],
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,
-            "Confidence_good": data["score"] >= 75,  # Score bueno para validar señal
+            "Confidence_good": data["score"] >= min_score_required,  # Score adaptativo por tendencia
             "Price_above_EMA": data["price"] > data["ema_fast"],
             "Candle_positive": data["candle_change_percent"] > 0.1
         }
@@ -126,40 +196,62 @@ class TradingLogic:
                 timeframe_data["1m"], "buy"
             )
         
+        # Validar vela de ruptura si hay datos
+        if timeframe_data and "1m" in timeframe_data:
+            conditions["Breakout_candle"] = self.validate_breakout_candle(
+                timeframe_data["1m"], "buy"
+            )
+
         # Verificar distancia de señales (con score para cooldown inteligente)
         conditions["Signal_distance"] = self.check_signal_distance(
             symbol, data["price"], "buy", data["score"]
         )
-        
+
+        # Añadir información de tendencia a las condiciones
+        conditions["Market_trend"] = market_trend
+        conditions["Trend_approved"] = trend_approved
+        conditions["Min_score_required"] = min_score_required
+
         # Simplificar: usar EXACTAMENTE los 8 criterios del dashboard
         # Excluir solo Signal_distance (control interno)
-        main_conditions = {k: v for k, v in conditions.items() if k != "Signal_distance"}
+        main_conditions = {k: v for k, v in conditions.items() if k not in ["Signal_distance", "Market_trend", "Trend_approved", "Min_score_required"]}
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos BUY: 6 de 8 condiciones principales + distancia OK (MÁXIMA PRECISIÓN)
-        required_main = 6
+        # Requerimientos BUY adaptativos por tendencia
+        if market_trend == "BULLISH":
+            required_main = 5  # Menos estricto en mercado favorable
+        else:
+            required_main = 6  # Más estricto en otros mercados
+
         main_valid = main_fulfilled >= required_main
 
-        logger.info(f"🔍 BUY {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
+        logger.info(f"🔍 BUY {symbol} ({market_trend}): {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
         if main_fulfilled < required_main:
-            logger.info(f"   ❌ Faltan {required_main - main_fulfilled} criterios para BUY (necesita {required_main}/8)")
+            logger.info(f"   ❌ Faltan {required_main - main_fulfilled} criterios para BUY (necesita {required_main}/8 en {market_trend})")
         if not signal_distance_ok:
             logger.info(f"   ❌ Distancia de señal no válida (cooldown activo)")
 
         return main_valid and signal_distance_ok, conditions
     
     def check_sell_conditions(self, symbol, market_data, timeframe_data):
-        """Verifica condiciones para señal de venta"""
+        """Verifica condiciones para señal de venta con filtro de tendencia"""
         data = market_data[symbol]
-        
-        # 8 condiciones SELL (opuestas a BUY)
+
+        # 1. FILTRO DE TENDENCIA PRIMERO (basado en datos reales)
+        market_trend = self.detect_market_trend(symbol, timeframe_data)
+        trend_approved, min_score_required = self.check_trend_filter(symbol, "sell", market_trend)
+
+        if not trend_approved:
+            return False, {}  # Rechazar inmediatamente si la tendencia no es favorable
+
+        # 2. Condiciones básicas con score adaptativo
         conditions = {
             "RSI_1m_favorable": 30 <= data["rsi_1m"] <= 70,  # Mismo que BUY
             "RSI_15m_bearish": data["rsi_15m"] < 50,          # Opuesto a BUY
             "EMA_crossunder": data["ema_fast"] < data["ema_slow"],  # Opuesto a BUY
             "Volume_high": data["volume"] > data["vol_avg"] * 1.2,  # Mismo que BUY
-            "Confidence_good": data["score"] >= 70,      # SELL más conservador
+            "Confidence_good": data["score"] >= min_score_required,  # Score adaptativo por tendencia
             "Price_below_EMA": data["price"] < data["ema_fast"],    # Opuesto a BUY
             "Candle_negative": data["candle_change_percent"] < -0.1,  # Opuesto a BUY
             "Breakout_candle": data["volume"] > data["vol_avg"] * 1.2 and data["candle_change_percent"] < -0.1  # Ruptura bajista
@@ -167,18 +259,29 @@ class TradingLogic:
 
         # Verificar distancia de señales (control interno)
         conditions["Signal_distance"] = self.check_signal_distance(symbol, data["price"], "sell", data["score"])
-        
+
+        # Añadir información de tendencia a las condiciones
+        conditions["Market_trend"] = market_trend
+        conditions["Trend_approved"] = trend_approved
+        conditions["Min_score_required"] = min_score_required
+
         # Simplificar: usar EXACTAMENTE los 8 criterios del dashboard
         # Excluir solo Signal_distance (control interno)
-        main_conditions = {k: v for k, v in conditions.items() if k != "Signal_distance"}
+        main_conditions = {k: v for k, v in conditions.items() if k not in ["Signal_distance", "Market_trend", "Trend_approved", "Min_score_required"]}
         main_fulfilled = sum(1 for v in main_conditions.values() if v)
         signal_distance_ok = conditions.get("Signal_distance", True)
 
-        # Requerimientos SELL: 6 de 8 condiciones principales + distancia OK (MÁXIMA PRECISIÓN)
-        required_main = 6
+        # Requerimientos SELL adaptativos por tendencia
+        if market_trend == "BEARISH":
+            required_main = 4  # Menos estricto en mercado bajista (66.7% WR histórico)
+        else:
+            required_main = 6  # Más estricto en otros mercados
+
         main_valid = main_fulfilled >= required_main
 
-        logger.info(f"🔍 SELL {symbol}: {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
+        logger.info(f"🔍 SELL {symbol} ({market_trend}): {main_fulfilled}/8 criterios + distancia {'✅' if signal_distance_ok else '❌'} = {'✅ VÁLIDA' if main_valid and signal_distance_ok else '❌ NO VÁLIDA'}")
+        if main_fulfilled < required_main:
+            logger.info(f"   ❌ Faltan {required_main - main_fulfilled} criterios para SELL (necesita {required_main}/8 en {market_trend})")
 
         return main_valid and signal_distance_ok, conditions
     
@@ -201,17 +304,34 @@ class TradingLogic:
 
             # Solo verificar límites de email si vamos a enviar email
             if send_email:
-                # SOLO ENVIAR EMAILS PARA SEÑALES ULTRA-PREMIUM (90+)
-                if data["score"] < 90:
-                    logger.info(f"📊 Señal registrada pero NO enviada por email - Score: {data['score']}/100 (requiere ≥90)")
-                    send_email = False  # Registrar pero no enviar email
+                # FILTRO INTELIGENTE BASADO EN TENDENCIA Y DATOS REALES
+                market_trend = conditions.get("Market_trend", "SIDEWAYS")
+                min_score_required = conditions.get("Min_score_required", 90)
 
-                # Verificar límite diario de emails para señales excelentes
-                if send_email and data["score"] < 90 and not self.check_daily_email_limit():
-                    logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails}) - Score: {data['score']}")
+                # Criterios adaptativos por tendencia (basado en análisis real)
+                email_approved = False
+                if market_trend == "BEARISH" and signal_type == "sell" and data["score"] >= 70:
+                    # SELL en BEARISH tiene 66.7% WR histórico - Enviar email
+                    email_approved = True
+                    logger.info(f"🔥 SEÑAL PREMIUM: SELL en BEARISH (Score: {data['score']}) - WR histórico: 66.7%")
+                elif market_trend == "BULLISH" and signal_type == "buy" and data["score"] >= 80:
+                    # BUY en BULLISH tiene 50% WR histórico - Más conservador
+                    email_approved = True
+                    logger.info(f"🔥 SEÑAL PREMIUM: BUY en BULLISH (Score: {data['score']}) - WR histórico: 50%")
+                elif data["score"] >= 95:
+                    # Score ultra-alto siempre se envía (independiente de tendencia)
+                    email_approved = True
+                    logger.info(f"🔥 SEÑAL ULTRA-PREMIUM (Score: {data['score']}) - Bypassing trend filter")
+                else:
+                    logger.info(f"📊 Señal registrada pero NO enviada por email - {signal_type.upper()} en {market_trend} (Score: {data['score']}) no cumple criterios premium")
                     send_email = False
-                elif send_email and data["score"] >= 90:
-                    logger.info(f"🔥 SEÑAL ULTRA-PREMIUM (Score: {data['score']}) - Bypassing daily limit")
+
+                # Verificar límite diario solo si la señal fue aprobada
+                if email_approved and not self.check_daily_email_limit():
+                    logger.warning(f"📧 Límite diario de emails alcanzado ({self.max_daily_emails})")
+                    send_email = False
+                elif not email_approved:
+                    send_email = False
             
             # Calcular price targets
             price_targets = calculate_price_targets(
@@ -304,10 +424,13 @@ class TradingLogic:
                 )
 
                 if sell_valid:
-                    # SELL signals no envían email, solo se registran
-                    if self.process_signal(symbol, "sell", market_data, sell_conditions, send_email=False):
-                        # Incrementar contador aunque no se envíe email para evitar duplicados
-                        pass
+                    # SELL signals pueden enviar email si son en mercado BEARISH (66.7% WR histórico)
+                    market_trend = sell_conditions.get("Market_trend", "SIDEWAYS")
+                    send_sell_email = (market_trend == "BEARISH")  # Solo SELL en BEARISH envían email
+
+                    if self.process_signal(symbol, "sell", market_data, sell_conditions, send_email=send_sell_email):
+                        if send_sell_email:
+                            signals_sent += 1  # Contar como señal enviada si se envió email
                 
             except Exception as e:
                 logger.error(f"❌ Error analizando señales para {symbol}: {e}")
@@ -342,7 +465,8 @@ class TradingLogic:
                 'market_conditions': {
                     'conditions': {k: bool(v) for k, v in conditions.items()},  # Convertir a bool explícitamente
                     'timeframe_data': 'multi_tf_analysis'
-                }
+                },
+                'market_trend': conditions.get('Market_trend', 'SIDEWAYS')
             }
 
             performance_tracker.record_signal(signal_data)

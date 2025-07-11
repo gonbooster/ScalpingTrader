@@ -2,6 +2,7 @@
 import json
 import sqlite3
 import logging
+import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import requests
@@ -42,6 +43,7 @@ class PerformanceTracker:
                 expected_move REAL,
                 risk_reward REAL,
                 market_conditions TEXT,
+                market_trend TEXT DEFAULT 'SIDEWAYS',
                 status TEXT DEFAULT 'PENDING',
                 result TEXT,
                 exit_price REAL,
@@ -69,22 +71,70 @@ class PerformanceTracker:
             )
         ''')
         
+        # Migración: Añadir columna market_trend si no existe
+        try:
+            cursor.execute("ALTER TABLE signals ADD COLUMN market_trend TEXT DEFAULT 'SIDEWAYS'")
+            logger.info("📊 Columna market_trend añadida a la base de datos")
+        except sqlite3.OperationalError:
+            # La columna ya existe
+            pass
+
         conn.commit()
         conn.close()
         logger.info("📊 Base de datos de rendimiento inicializada")
     
+    def detect_market_trend(self, symbol_data):
+        """Detecta la tendencia del mercado: BULLISH, BEARISH, SIDEWAYS"""
+        try:
+            # Obtener datos de múltiples timeframes para análisis de tendencia
+            from binance_api import get_multi_timeframe_data, extract_prices
+            from indicators import calculate_ema
+
+            # Obtener datos de 1h para análisis de tendencia
+            data_1h = get_multi_timeframe_data(symbol_data['symbol'], '1h', 50)
+            if not data_1h or len(data_1h) < 20:
+                return 'SIDEWAYS'  # Default si no hay datos suficientes
+
+            prices_1h = extract_prices(data_1h)
+            closes_1h = np.array(prices_1h["closes"])
+
+            # EMAs para determinar tendencia
+            ema_20 = calculate_ema(closes_1h, 20)
+            ema_50 = calculate_ema(closes_1h, 50)
+            current_price = closes_1h[-1]
+
+            # Calcular slope de precios (últimas 10 velas)
+            recent_prices = closes_1h[-10:]
+            price_slope = (recent_prices[-1] - recent_prices[0]) / recent_prices[0] * 100
+
+            # Determinar tendencia
+            if current_price > ema_20 > ema_50 and price_slope > 1.0:
+                return 'BULLISH'
+            elif current_price < ema_20 < ema_50 and price_slope < -1.0:
+                return 'BEARISH'
+            else:
+                return 'SIDEWAYS'
+
+        except Exception as e:
+            logger.error(f"Error detectando tendencia: {e}")
+            return 'SIDEWAYS'
+
     def record_signal(self, signal_data: Dict):
-        """Registra una nueva señal enviada"""
+        """Registra una nueva señal enviada con detección de tendencia"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        
+
+        # Detectar tendencia del mercado (usar datos del signal_data si están disponibles)
+        market_trend = signal_data.get('market_trend', 'SIDEWAYS')
+
         cursor.execute('''
             INSERT INTO signals (
                 timestamp, symbol, signal_type, entry_price, score,
                 conditions_met, total_conditions, rsi_1m, rsi_15m,
                 ema_fast, ema_slow, volume_ratio, atr, candle_change,
-                tp_price, sl_price, expected_move, risk_reward, market_conditions
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                tp_price, sl_price, expected_move, risk_reward, market_conditions,
+                market_trend
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             signal_data['timestamp'],
             signal_data['symbol'],
@@ -104,14 +154,15 @@ class PerformanceTracker:
             signal_data.get('sl_price'),
             signal_data.get('expected_move'),
             signal_data.get('risk_reward'),
-            json.dumps(signal_data.get('market_conditions', {}))
+            json.dumps(signal_data.get('market_conditions', {})),
+            market_trend
         ))
-        
+
         signal_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        
-        logger.info(f"📊 Señal registrada: {signal_data['symbol']} {signal_data['signal_type']} (ID: {signal_id})")
+
+        logger.info(f"📊 Señal registrada: {signal_data['symbol']} {signal_data['signal_type']} (ID: {signal_id}) Tendencia: {market_trend}")
         return signal_id
     
     def record_market_data(self, market_data: Dict):
@@ -626,6 +677,54 @@ class PerformanceTracker:
 
         score_stats = cursor.fetchall()
 
+        # 🚀 NUEVO: Estadísticas por TENDENCIA DE MERCADO
+        cursor.execute('''
+            SELECT
+                COALESCE(market_trend, 'SIDEWAYS') as trend,
+                signal_type,
+                COUNT(*) as count,
+                SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
+                AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
+                AVG(score) as avg_score,
+                MAX(actual_return) as best_return,
+                MIN(actual_return) as worst_return
+            FROM signals
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
+            GROUP BY trend, signal_type
+            ORDER BY trend, signal_type
+        '''.format(days))
+
+        trend_stats = cursor.fetchall()
+
+        # 🎯 NUEVO: Análisis de Score por Tendencia (Score ≥80 solamente)
+        cursor.execute('''
+            SELECT
+                COALESCE(market_trend, 'SIDEWAYS') as trend,
+                CASE
+                    WHEN score >= 90 THEN 'ULTRA-PREMIUM (90-100)'
+                    WHEN score >= 85 THEN 'PREMIUM (85-89)'
+                    WHEN score >= 80 THEN 'EXCELENTE (80-84)'
+                    ELSE 'OTROS (<80)'
+                END as score_range,
+                COUNT(*) as count,
+                SUM(CASE WHEN result LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
+                AVG(CASE WHEN actual_return IS NOT NULL THEN actual_return END) as avg_return,
+                AVG(score) as avg_score
+            FROM signals
+            WHERE datetime(timestamp) > datetime('now', '-{} days')
+            AND score >= 80
+            GROUP BY trend, score_range
+            ORDER BY trend,
+                CASE
+                    WHEN score_range = 'ULTRA-PREMIUM (90-100)' THEN 1
+                    WHEN score_range = 'PREMIUM (85-89)' THEN 2
+                    WHEN score_range = 'EXCELENTE (80-84)' THEN 3
+                    ELSE 4
+                END
+        '''.format(days))
+
+        score_by_trend_stats = cursor.fetchall()
+
         # Estadísticas por símbolo (INCLUIR TODAS las señales)
         cursor.execute('''
             SELECT
@@ -783,16 +882,33 @@ class PerformanceTracker:
                 }
                 for row in hourly_stats
             ],
-            'hourly_breakdown': [
+            # 🚀 NUEVO: Análisis por Tendencia de Mercado
+            'trend_breakdown': [
                 {
-                    'hour': f"{int(row[0]):02d}:00",
-                    'count': row[1],
-                    'wins': row[2],
-                    'win_rate': (row[2] / row[1] * 100) if row[1] > 0 else 0,
-                    'avg_return': row[3] or 0,
-                    'avg_score': row[4] or 0
+                    'trend': row[0],
+                    'signal_type': row[1],
+                    'count': row[2],
+                    'wins': row[3],
+                    'win_rate': (row[3] / row[2] * 100) if row[2] > 0 else 0,
+                    'avg_return': row[4] or 0,
+                    'avg_score': row[5] or 0,
+                    'best_return': row[6] or 0,
+                    'worst_return': row[7] or 0
                 }
-                for row in hourly_stats
+                for row in trend_stats
+            ],
+            # 🎯 NUEVO: Score por Tendencia (Solo Score ≥80)
+            'score_by_trend_breakdown': [
+                {
+                    'trend': row[0],
+                    'score_range': row[1],
+                    'count': row[2],
+                    'wins': row[3],
+                    'win_rate': (row[3] / row[2] * 100) if row[2] > 0 else 0,
+                    'avg_return': row[4] or 0,
+                    'avg_score': row[5] or 0
+                }
+                for row in score_by_trend_stats
             ],
             'volatility_breakdown': [
                 {

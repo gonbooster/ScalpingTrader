@@ -191,6 +191,25 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                 font-weight: 700;
             }}
 
+            /* Estilos para análisis de tendencia */
+            .trend-header {{
+                background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+                border-left: 4px solid #3b82f6;
+                margin-top: 8px;
+                font-weight: 600;
+            }}
+
+            .trend-signal {{
+                background: rgba(55, 65, 81, 0.3);
+                margin-left: 12px;
+                border-left: 2px solid #6b7280;
+            }}
+
+            .trend-signal .score-range {{
+                font-size: 0.9em;
+                color: #d1d5db;
+            }}
+
             /* Responsive para análisis por símbolo */
             @media (max-width: 768px) {{
                 .symbol-breakdown-item {{
@@ -374,6 +393,22 @@ def generate_analytics_dashboard(performance_stats, recent_signals, market_trend
                     <div class="chart-title">📈 Rendimiento por Score</div>
                     <div class="score-breakdown">
                         {generate_score_breakdown(performance_stats.get('score_breakdown', []))}
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">🌊 Análisis por Tendencia de Mercado</div>
+                    <div class="score-breakdown">
+                        {generate_trend_breakdown(performance_stats.get('trend_breakdown', []))}
+                    </div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">🎯 Score por Contexto de Mercado</div>
+                    <div class="score-breakdown">
+                        {generate_score_by_trend_breakdown(performance_stats.get('score_by_trend_breakdown', []))}
                     </div>
                 </div>
 
@@ -1126,7 +1161,112 @@ def generate_streak_analysis(streak_analysis):
     """
     return html
 
+def generate_trend_breakdown(trend_breakdown):
+    """Genera el desglose de rendimiento por tendencia de mercado"""
+    if not trend_breakdown:
+        return "<div class='score-item'><span>No hay datos de tendencia suficientes</span></div>"
 
+    # Agrupar por tendencia
+    trends = {}
+    for item in trend_breakdown:
+        trend = item.get('trend', 'SIDEWAYS')
+        if trend not in trends:
+            trends[trend] = {'BUY': None, 'SELL': None}
+        trends[trend][item.get('signal_type', 'BUY')] = item
+
+    html = ""
+    trend_emojis = {
+        'BULLISH': '📈',
+        'BEARISH': '📉',
+        'SIDEWAYS': '➡️'
+    }
+
+    for trend, signals in trends.items():
+        emoji = trend_emojis.get(trend, '❓')
+
+        html += f"""
+        <div class="score-item trend-header">
+            <span class="score-range">{emoji} {trend}</span>
+        </div>
+        """
+
+        for signal_type, data in signals.items():
+            if data:
+                win_rate = safe_float(data.get('win_rate', 0))
+                color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
+                signal_emoji = '🟢' if signal_type == 'BUY' else '🔴'
+
+                html += f"""
+                <div class="score-item trend-signal">
+                    <span class="score-range">  {signal_emoji} {signal_type}</span>
+                    <div class="score-stats">
+                        <span class="{color_class}">{win_rate:.1f}% WR</span>
+                        <span>{data.get('count', 0)} señales</span>
+                        <span>{safe_float(data.get('avg_return', 0)):+.2f}%</span>
+                        <span>🎯 {safe_float(data.get('avg_score', 0)):.0f}/100</span>
+                    </div>
+                </div>
+                """
+
+    return html
+
+def generate_score_by_trend_breakdown(score_by_trend_breakdown):
+    """Genera el desglose de score por tendencia de mercado"""
+    if not score_by_trend_breakdown:
+        return "<div class='score-item'><span>No hay datos de score por tendencia suficientes</span></div>"
+
+    # Agrupar por tendencia y score
+    trends = {}
+    for item in score_by_trend_breakdown:
+        trend = item.get('trend', 'SIDEWAYS')
+        score_range = item.get('score_range', 'OTROS')
+
+        if trend not in trends:
+            trends[trend] = {}
+        trends[trend][score_range] = item
+
+    html = ""
+    trend_emojis = {
+        'BULLISH': '📈',
+        'BEARISH': '📉',
+        'SIDEWAYS': '➡️'
+    }
+
+    score_emojis = {
+        'ULTRA-PREMIUM (90-100)': '💎',
+        'PREMIUM (85-89)': '🥇',
+        'EXCELENTE (80-84)': '🥈',
+        'OTROS (<80)': '🥉'
+    }
+
+    for trend, scores in trends.items():
+        emoji = trend_emojis.get(trend, '❓')
+
+        html += f"""
+        <div class="score-item trend-header">
+            <span class="score-range">{emoji} {trend}</span>
+        </div>
+        """
+
+        for score_range, data in scores.items():
+            if data:
+                win_rate = safe_float(data.get('win_rate', 0))
+                color_class = 'win-rate' if win_rate >= 60 else 'neutral' if win_rate >= 50 else 'loss-rate'
+                score_emoji = score_emojis.get(score_range, '❓')
+
+                html += f"""
+                <div class="score-item trend-signal">
+                    <span class="score-range">  {score_emoji} {score_range}</span>
+                    <div class="score-stats">
+                        <span class="{color_class}">{win_rate:.1f}% WR</span>
+                        <span>{data.get('count', 0)} señales</span>
+                        <span>{safe_float(data.get('avg_return', 0)):+.2f}%</span>
+                        <span>📊 {safe_float(data.get('avg_score', 0)):.0f}/100</span>
+                    </div>
+                </div>
+                """
+
+    return html
 
 def generate_streak_info_for_symbol(symbol, symbol_streaks):
     """Genera información de racha para un símbolo específico"""

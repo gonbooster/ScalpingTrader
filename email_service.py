@@ -73,6 +73,19 @@ def create_professional_email(signal_type: str, symbol: str, price: float,
         emoji = "🔴"
         action = "VENTA"
 
+    # Crear enlace directo al mercado de Binance
+    # Convertir BTCUSDT -> BTC_USDT para la URL de Binance
+    if symbol.endswith('USDT'):
+        base_asset = symbol[:-4]  # Quitar 'USDT'
+        binance_pair = f"{base_asset}_USDT"
+    elif symbol.endswith('USDC'):
+        base_asset = symbol[:-4]  # Quitar 'USDC'
+        binance_pair = f"{base_asset}_USDC"
+    else:
+        binance_pair = symbol  # Fallback
+
+    binance_url = f"https://www.binance.com/en/trade/{binance_pair}?_from=markets&type=spot"
+
     # Mapear condiciones REALES del backend con información educativa completa
     criteria_map = {
         "RSI_1m_favorable": f"🔴 RSI 1min: {rsi:.1f}/100 (Objetivo: 30-70 zona favorable)",
@@ -142,6 +155,9 @@ def create_professional_email(signal_type: str, symbol: str, price: float,
 {f'''🟢 Take Profit: ${price_targets["take_profit"]:,.2f} (+{price_targets["expected_move_percent"]:.1f}%)
 🔴 Stop Loss: ${price_targets["stop_loss"]:,.2f} (-{price_targets["risk_percent"]:.1f}%)
 ⚖️ Risk/Reward: 1:{price_targets["risk_reward_ratio"]:.1f}''' if price_targets else 'No calculado'}
+
+📈 ACCESO DIRECTO AL MERCADO:
+🔗 Binance: {binance_url}
 
 ⚠️ Solo para fines educativos. Gestiona tu riesgo responsablemente.
     """
@@ -250,6 +266,16 @@ def create_professional_email(signal_type: str, symbol: str, price: float,
                         </div>
                     </div>
                 </div>''' if price_targets else ''}
+
+                <div style="background: #e3f2fd; border: 2px solid #2196f3; padding: 20px; border-radius: 10px; margin: 20px 0; text-align: center;">
+                    <h3 style="color: #1976d2; margin-top: 0;">📈 ACCESO DIRECTO AL MERCADO</h3>
+                    <a href="{binance_url}" target="_blank" style="display: inline-block; background: #f0b90b; color: #000; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 10px 0;">
+                        🔗 Abrir {symbol} en Binance
+                    </a>
+                    <div style="font-size: 12px; color: #666; margin-top: 10px;">
+                        Enlace directo al par {symbol} en Binance Spot Trading
+                    </div>
+                </div>
 
                 <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 10px; margin: 20px 0;">
                     <h4 style="margin-top: 0; color: #856404;">⚠️ IMPORTANTE - GESTIÓN DE RIESGO</h4>
