@@ -204,8 +204,8 @@ def api_data():
 
 @app.route("/logs")
 def view_logs():
-    """Endpoint para ver logs del bot"""
-    return get_logs_html_response(100)
+    """Endpoint para ver logs del bot - Muestra todos los logs del día actual"""
+    return get_logs_html_response()
 
 @app.route('/repair-database')
 def repair_database():
@@ -270,8 +270,8 @@ def repair_database():
 
 @app.route("/logs-json")
 def view_logs_json():
-    """Endpoint para logs en JSON"""
-    return get_logs_json_response(50)
+    """Endpoint para logs en JSON - Muestra todos los logs del día actual"""
+    return get_logs_json_response()
 
 @app.route("/test-email")
 def test_email():

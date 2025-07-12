@@ -1,3 +1,42 @@
+def get_trend_indicator(market_trend):
+    """Genera el indicador visual de tendencia de mercado"""
+    trend_configs = {
+        'BULLISH': {
+            'icon': '📈',
+            'text': 'ALCISTA',
+            'color': '#10b981',
+            'bg_color': 'rgba(16, 185, 129, 0.1)',
+            'description': 'Mercado en tendencia alcista. Favorable para señales de COMPRA. Los precios están por encima de las medias móviles con momentum positivo.'
+        },
+        'BEARISH': {
+            'icon': '📉',
+            'text': 'BAJISTA',
+            'color': '#ef4444',
+            'bg_color': 'rgba(239, 68, 68, 0.1)',
+            'description': 'Mercado en tendencia bajista. Favorable para señales de VENTA. Los precios están por debajo de las medias móviles con momentum negativo.'
+        },
+        'SIDEWAYS': {
+            'icon': '➡️',
+            'text': 'LATERAL',
+            'color': '#6b7280',
+            'bg_color': 'rgba(107, 114, 128, 0.1)',
+            'description': 'Mercado en consolidación lateral. Baja probabilidad de señales efectivas. Se recomienda esperar una tendencia clara.'
+        }
+    }
+
+    config = trend_configs.get(market_trend, trend_configs['SIDEWAYS'])
+
+    return {
+        'html': f'''
+        <div class="trend-indicator" style="background: {config['bg_color']}; color: {config['color']}; border: 1px solid {config['color']};"
+             title="{config['description']}">
+            <span class="trend-icon">{config['icon']}</span>
+            <span class="trend-text">{config['text']}</span>
+        </div>
+        ''',
+        'config': config
+    }
+
 def generate_dashboard_html(market_data, last_signals, signal_count, bot_running, last_analysis_time, using_simulation, email_status):
     """Dashboard limpio con diseño profesional"""
     from version_info import get_version_badge
@@ -12,12 +51,16 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
         vol_ratio = data.get('volume_ratio', 0)
         score = data.get('score', 0)
         candle_change = data.get('candle_change_percent', 0)
+        market_trend = data.get('market_trend', 'SIDEWAYS')
 
         # Iconos y colores por crypto
         icons = {'BTC': '₿', 'ETH': 'Ξ', 'SOL': '◎'}
         colors = {'BTC': '#f7931a', 'ETH': '#627eea', 'SOL': '#9945ff'}
         icon = icons.get(name, '●')
         color = colors.get(name, '#64748b')
+
+        # Indicador de tendencia de mercado
+        trend_info = get_trend_indicator(market_trend)
 
         # 8 criterios PRINCIPALES con indicadores de intensidad
         # Nota: Breakout_candle y Signal_distance se evalúan internamente
@@ -150,6 +193,7 @@ def generate_dashboard_html(market_data, last_signals, signal_count, bot_running
                 <div class="price-change-now" style="color:{change_now_color}">
                     {change_now_icon} {price_change_percent:+.3f}% (${price_change_amount:+,.2f}) última act.
                 </div>
+                {trend_info['html']}
             </td>
             <td class="criterion" title="RSI 1min: {rsi_1m:.1f} - {c1_intensity}"><span class="signal-{c1.lower().replace('🟢', 'excellent')}">{c1}</span></td>
             <td class="criterion" title="RSI 15min: {rsi_15m:.1f} - {c2_intensity}"><span class="signal-{c2.lower().replace('🟢', 'excellent')}">{c2}</span></td>
@@ -308,6 +352,34 @@ body {{
 .price-main {{ font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }}
 .price-change-24h {{ font-size: 0.75rem; font-weight: 600; margin-bottom: 2px; }}
 .price-change-now {{ font-size: 0.7rem; font-weight: 500; opacity: 0.9; }}
+
+/* Indicador de tendencia de mercado */
+.trend-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-top: 4px;
+    cursor: help;
+    transition: all 0.2s ease;
+}
+
+.trend-indicator:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.trend-icon {
+    font-size: 0.8rem;
+}
+
+.trend-text {{
+    font-size: 0.65rem;
+    letter-spacing: 0.5px;
+}}
 .signal-✓ {{ color: #22c55e; font-weight: 700; }}
 .signal-○ {{ color: #64748b; }}
 .signal-excellent {{ color: #8b5cf6; font-weight: 800; text-shadow: 0 0 8px rgba(139, 92, 246, 0.6); }}

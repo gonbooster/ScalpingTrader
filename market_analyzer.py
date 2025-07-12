@@ -134,13 +134,9 @@ class MarketAnalyzer:
             else:
                 rsi_15m = rsi_5m
             
-            # Macro trend (1h)
-            macro_trend = True  # Simplificado por ahora
-            if data_1h and len(data_1h) >= 20:
-                prices_1h = extract_prices(data_1h)
-                closes_1h = np.array(prices_1h["closes"])
-                ema_1h = calculate_ema(closes_1h, 20)
-                macro_trend = close_now > ema_1h
+            # Detección de tendencia de mercado (1h)
+            market_trend = self.detect_market_trend(data_1h, close_now)
+            macro_trend = market_trend == "BULLISH"  # Para compatibilidad
             
             # Calcular % de cambio de vela actual
             open_price = float(data_1m[0][1])
@@ -202,7 +198,8 @@ class MarketAnalyzer:
                 "expected_move_sell": price_targets_sell["expected_move_percent"],
                 "risk_reward_sell": price_targets_sell["risk_reward_ratio"],
                 "buy_criteria": buy_criteria,
-                "sell_criteria": sell_criteria
+                "sell_criteria": sell_criteria,
+                "market_trend": market_trend
             })
             
             logger.info(f"✅ {symbol}: price=${close_now:,.2f}, rsi={rsi_1m:.1f}, score={confidence_score}/100")
@@ -251,6 +248,35 @@ class MarketAnalyzer:
             "total": len(criteria),
             "percentage": (fulfilled / len(criteria)) * 100
         }
+
+    def detect_market_trend(self, data_1h, current_price):
+        """Detecta la tendencia del mercado usando datos de 1h"""
+        try:
+            if not data_1h or len(data_1h) < 50:
+                return 'SIDEWAYS'
+
+            prices_1h = extract_prices(data_1h)
+            closes_1h = np.array(prices_1h["closes"])
+
+            # EMAs para determinar tendencia
+            ema_20 = calculate_ema(closes_1h, 20)
+            ema_50 = calculate_ema(closes_1h, 50) if len(closes_1h) >= 50 else ema_20
+
+            # Calcular slope de precios (últimas 10 velas)
+            recent_prices = closes_1h[-10:]
+            price_slope = (recent_prices[-1] - recent_prices[0]) / recent_prices[0] * 100
+
+            # Determinar tendencia basada en datos reales
+            if current_price > ema_20 > ema_50 and price_slope > 1.0:
+                return 'BULLISH'
+            elif current_price < ema_20 < ema_50 and price_slope < -1.0:
+                return 'BEARISH'
+            else:
+                return 'SIDEWAYS'
+
+        except Exception as e:
+            logger.error(f"Error detectando tendencia: {e}")
+            return 'SIDEWAYS'
 
     def calculate_sell_criteria(self, price, rsi_1m, rsi_15m, ema_fast, ema_slow, volume, vol_avg, score, candle_change):
         """Calcula criterios de venta para visualización"""
