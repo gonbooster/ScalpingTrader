@@ -354,7 +354,7 @@ body {{
 .price-change-now {{ font-size: 0.7rem; font-weight: 500; opacity: 0.9; }}
 
 /* Indicador de tendencia de mercado */
-.trend-indicator {
+.trend-indicator {{
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -365,16 +365,16 @@ body {{
     margin-top: 4px;
     cursor: help;
     transition: all 0.2s ease;
-}
+}}
 
-.trend-indicator:hover {
+.trend-indicator:hover {{
     transform: scale(1.05);
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-}
+}}
 
-.trend-icon {
+.trend-icon {{
     font-size: 0.8rem;
-}
+}}
 
 .trend-text {{
     font-size: 0.65rem;
